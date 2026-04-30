@@ -1,0 +1,14 @@
+{
+  "name": "mixsocial",
+  "version": "1.0.0",
+  "description": "MixSocial — cocktail community app",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm install --prefix backend && node backend/server.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev"
+  }
+}

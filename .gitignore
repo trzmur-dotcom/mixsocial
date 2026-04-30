@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+backend/dist/
+
+# Database & WAL files
+*.db
+*.db-wal
+*.db-shm
+
+# Uploaded images (stored on Railway volume, not in repo)
+backend/uploads/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

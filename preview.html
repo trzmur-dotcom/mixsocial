@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>MixSocial Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080810;color:#fff;font-family:'Inter',sans-serif;display:flex;justify-content:center;min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:#8b5cf6;border-radius:2px}
+
+/* App shell */
+#app{width:100%;max-width:480px;min-height:100vh;background:#080810;position:relative;overflow:hidden}
+.page{padding-bottom:80px;min-height:100vh}
+.screen{display:none;width:100%;height:100%}
+.screen.active{display:block}
+
+/* Nav */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(8,8,16,.95);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.06);display:flex;z-index:50}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:3px;cursor:pointer;color:rgba(255,255,255,.3);transition:.2s}
+.nav-item.active{color:#a78bfa}
+.nav-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.nav-item.active svg{stroke-width:2.5}
+.nav-label{font-size:10px;font-weight:500}
+
+/* Header */
+.top-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(8,8,16,.95);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.05)}
+.logo{font-size:22px;font-weight:800;background:linear-gradient(135deg,#a78bfa,#ec4899,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* Stories row */
+.stories-row{display:flex;gap:14px;overflow-x:auto;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);scrollbar-width:none}
+.stories-row::-webkit-scrollbar{display:none}
+.story-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;cursor:pointer}
+.story-ring{background:linear-gradient(135deg,#8b5cf6,#ec4899,#fbbf24);padding:2.5px;border-radius:50%;transition:transform .2s}
+.story-ring:hover{transform:scale(1.05)}
+.story-ring-inner{background:#080810;border-radius:50%;padding:2px}
+.story-ring.viewed{background:#2a2a3e}
+.avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0}
+.story-name{font-size:11px;color:rgba(255,255,255,.6);max-width:64px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Add story */
+.add-ring{background:#2a2a3e;padding:2.5px;border-radius:50%;position:relative}
+.add-badge{position:absolute;bottom:0;right:0;width:18px;height:18px;background:linear-gradient(135deg,#8b5cf6,#ec4899);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;line-height:1}
+
+/* Feed card */
+.feed-card{border-bottom:1px solid rgba(255,255,255,.05)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+.card-user{display:flex;align-items:center;gap:10px;cursor:pointer}
+.username{font-size:13px;font-weight:600;color:#fff}
+.time-ago{font-size:11px;color:rgba(255,255,255,.35)}
+.alcohol-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px}
+.card-image{width:100%;aspect-ratio:1/1;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.card-image-overlay{position:absolute;bottom:0;left:0;right:0;padding:16px;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 100%)}
+.cocktail-title{font-size:22px;font-weight:800;color:#fff;line-height:1.2}
+.cocktail-desc{font-size:13px;color:rgba(255,255,255,.6);margin-top:4px}
+.card-actions{padding:10px 16px 12px}
+.card-stats{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.stat{display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,.35)}
+.save-btn{margin-left:auto;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:.2s}
+.food-pairing{display:flex;align-items:flex-start;gap:7px;padding:8px 12px;border-radius:12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.12)}
+.food-label{color:rgba(245,158,11,.8);font-size:11px;font-weight:600}
+.food-text{color:rgba(255,255,255,.5);font-size:11px}
+
+/* Story viewer overlay */
+.story-overlay{position:fixed;inset:0;z-index:100;background:#000;max-width:480px;left:50%;transform:translateX(-50%);display:none;flex-direction:column}
+.story-overlay.open{display:flex}
+.progress-bars{display:flex;gap:4px;padding:10px 12px 0}
+.prog-bar{flex:1;height:2px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:#fff;border-radius:2px}
+.story-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px}
+.close-btn{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:22px;line-height:1;padding:4px}
+.story-bg{position:absolute;inset:0;z-index:-1}
+.story-content{margin-top:auto;position:relative;z-index:10}
+.story-tags{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 8px}
+.story-title{font-size:26px;font-weight:800;color:#fff;padding:0 20px;line-height:1.2}
+.story-meta{display:flex;gap:14px;padding:8px 20px;font-size:12px}
+.recipe-toggle{width:calc(100% - 24px);margin:0 12px 12px;background:rgba(0,0,0,.6);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden}
+.recipe-toggle-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:none;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.recipe-body{padding:0 16px 16px;max-height:280px;overflow-y:auto}
+.recipe-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px}
+.ingredient-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.ing-name{color:rgba(255,255,255,.8)}
+.ing-amount{color:rgba(255,255,255,.45);font-family:monospace;font-size:12px}
+.instruction-row{display:flex;gap:8px;font-size:13px;margin-bottom:8px}
+.step-num{color:#a78bfa;font-weight:700;flex-shrink:0;width:18px}
+.step-text{color:rgba(255,255,255,.75)}
+.pairing-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:10px 12px;margin-top:12px}
+.story-save-btn{margin:0 12px 28px;width:calc(100% - 24px);padding:14px;border-radius:16px;border:none;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* Rating modal */
+.rating-modal{position:absolute;bottom:0;left:0;right:0;background:#111120;border-top:1px solid rgba(255,255,255,.1);padding:20px;z-index:20;border-radius:24px 24px 0 0}
+.rating-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.rating-num{aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.rating-num:hover{background:rgba(245,158,11,.25);border-color:rgba(245,158,11,.5);color:#fbbf24;transform:scale(1.08)}
+
+/* Recipe book */
+.recipe-book-card{background:#111120;border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;margin-bottom:12px}
+.rb-header{padding:14px 16px 10px;cursor:pointer}
+.rb-name{font-size:15px;font-weight:700;color:#fff}
+.rb-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:3px}
+.rb-tags{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 6px}
+.rb-meta{display:flex;gap:12px;font-size:11px;color:rgba(255,255,255,.35)}
+.rating-badge{display:flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);font-size:13px;font-weight:700;color:#fbbf24}
+.rb-expand{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.rb-expand.open{max-height:600px}
+.rb-divider{height:1px;background:rgba(255,255,255,.05)}
+.rb-body{padding:12px 16px}
+.rb-actions{display:flex;gap:8px;padding:10px 12px 12px;border-top:1px solid rgba(255,255,255,.05)}
+.rb-action-btn{flex:1;padding:8px;border-radius:12px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+
+/* My Bar */
+.bar-overlay{position:fixed;top:0;bottom:0;z-index:200;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);display:none;align-items:flex-end;width:100%;max-width:480px;left:50%;transform:translateX(-50%)}
+.bar-overlay.open{display:flex}
+.bar-sheet{width:100%;background:#0e0e1a;border:1px solid rgba(255,255,255,.08);border-radius:24px 24px 0 0;max-height:85vh;display:flex;flex-direction:column}
+.bar-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.bar-grid{display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px;overflow-y:auto;flex:1}
+.bar-item{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;cursor:pointer;transition:.2s;border:1px solid rgba(255,255,255,.09);font-size:13px;font-weight:600;width:fit-content;flex-shrink:0}
+.bar-footer{padding:14px 20px;border-top:1px solid rgba(255,255,255,.06)}
+.btn-grad{background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff;border:none;border-radius:14px;padding:13px;width:100%;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn-grad:hover{opacity:.9}
+
+/* Upload */
+.upload-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);display:none;align-items:flex-end;max-width:480px;left:50%;transform:translateX(-50%)}
+.upload-overlay.open{display:flex}
+.upload-sheet{width:100%;background:#0e0e1a;border:1px solid rgba(255,255,255,.08);border-radius:24px 24px 0 0;max-height:92vh;overflow-y:auto}
+
+/* Login */
+.login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;position:relative;overflow:hidden}
+.glow-top{position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:400px;height:400px;background:rgba(139,92,246,.08);border-radius:50%;filter:blur(60px);pointer-events:none}
+.login-card{width:100%;max-width:360px;position:relative;z-index:1}
+.login-logo{text-align:center;margin-bottom:40px}
+.logo-emoji{font-size:64px;display:block;margin-bottom:10px}
+.logo-text{font-size:32px;font-weight:800;background:linear-gradient(135deg,#a78bfa,#ec4899,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{color:rgba(255,255,255,.3);font-size:13px;margin-top:4px}
+.tab-row{display:flex;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:4px;margin-bottom:20px}
+.tab-btn{flex:1;padding:10px;border-radius:12px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.tab-btn.active{background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff}
+.tab-btn:not(.active){background:transparent;color:rgba(255,255,255,.35)}
+.form-input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:12px;padding:13px 16px;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px;transition:border-color .2s}
+.form-input:focus{border-color:#8b5cf6}
+.form-input::placeholder{color:rgba(255,255,255,.3)}
+.demo-hint{text-align:center;margin-top:20px;color:rgba(255,255,255,.2);font-size:12px}
+
+/* Explore */
+.search-wrap{position:relative}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3)}
+.search-input{padding-left:42px!important;border-radius:16px!important;margin:0!important}
+.filter-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.filter-scroll::-webkit-scrollbar{display:none}
+.filter-chip{flex-shrink:0;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid transparent;transition:.2s}
+
+/* Profile */
+.profile-avatar{width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#fff;flex-shrink:0}
+.stats-row{display:flex;background:#111120;border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.stat-cell{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;border-right:1px solid rgba(255,255,255,.06)}
+.stat-cell:last-child{border-right:none}
+.stat-num{font-size:20px;font-weight:800;color:#fff}
+.stat-label{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.tabs-row{display:flex;gap:8px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+
+/* Shared */
+.section-header{display:flex;align-items:center;gap:8px;padding:12px 16px 6px;border-top:1px solid rgba(255,255,255,.05)}
+.section-title{font-size:14px;font-weight:700;color:#fff}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 32px;text-align:center}
+.empty-emoji{font-size:52px;margin-bottom:14px}
+.empty-title{font-size:16px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:6px}
+.empty-sub{font-size:13px;color:rgba(255,255,255,.25)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.slide-up{animation:slideUp .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes prog{from{width:0%}to{width:100%}}
+.progressing{animation:prog 8s linear forwards}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ========== LOGIN SCREEN ========== -->
+<div id="screen-login" class="screen active">
+  <div class="login-screen">
+    <div class="glow-top"></div>
+    <div class="login-card fade-in">
+      <div class="login-logo">
+        <span class="logo-emoji">🍹</span>
+        <div class="logo-text">MixSocial</div>
+        <div class="logo-sub">The cocktail community</div>
+      </div>
+      <div class="tab-row">
+        <button class="tab-btn active">Sign In</button>
+        <button class="tab-btn" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')">Sign Up</button>
+      </div>
+      <input class="form-input" type="email" placeholder="Email" value="master@demo.com">
+      <input class="form-input" type="password" placeholder="Password" value="demo123">
+      <button class="btn-grad" onclick="goTo('home')">Sign In</button>
+      <div class="demo-hint">Demo: master@demo.com / demo123</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HOME SCREEN ========== -->
+<div id="screen-home" class="screen page">
+  <div class="top-bar">
+    <span class="logo">MixSocial</span>
+    <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5)">
+      <button id="lang-btn" onclick="toggleLang()" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer">🌐</button>
+      <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </div>
+  </div>
+
+  <div class="stories-row">
+    <!-- Your story -->
+    <div class="story-item" onclick="openUpload()">
+      <div class="add-ring">
+        <div style="background:#080810;border-radius:50%;padding:2px">
+          <div class="avatar" id="my-story-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);width:56px;height:56px;font-size:22px;overflow:hidden;position:relative">
+            <img id="my-story-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0"/>
+            <span id="my-story-avatar-letter">C</span>
+          </div>
+        </div>
+        <div class="add-badge">+</div>
+      </div>
+      <span class="story-name">Your Cocktail</span>
+    </div>
+    <!-- Stories -->
+    <div class="story-item" onclick="openStory(0)">
+      <div class="story-ring"><div class="story-ring-inner"><div class="avatar" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);width:56px;height:56px;font-size:20px">G</div></div></div>
+      <span class="story-name" style="font-weight:600">gin_adv...</span>
+    </div>
+    <div class="story-item" onclick="openStory(1)">
+      <div class="story-ring"><div class="story-ring-inner"><div class="avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444);width:56px;height:56px;font-size:20px">W</div></div></div>
+      <span class="story-name" style="font-weight:600">whiskey...</span>
+    </div>
+    <div class="story-item" onclick="openStory(2)">
+      <div class="story-ring viewed"><div class="story-ring-inner"><div class="avatar" style="background:linear-gradient(135deg,#fb923c,#f59e0b);width:56px;height:56px;font-size:20px">T</div></div></div>
+      <span class="story-name">tropical</span>
+    </div>
+    <div class="story-item" onclick="openStory(3)">
+      <div class="story-ring"><div class="story-ring-inner"><div class="avatar" style="background:linear-gradient(135deg,#ec4899,#f59e0b);width:56px;height:56px;font-size:20px">C</div></div></div>
+      <span class="story-name" style="font-weight:600">cocktail...</span>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div id="feed-container">
+  <!-- Card 1 -->
+  <div class="feed-card fade-in">
+    <div class="card-header">
+      <div class="card-user">
+        <div class="avatar" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);width:36px;height:36px;font-size:14px">G</div>
+        <div><div class="username">gin_adventures</div><div class="time-ago">2h ago</div></div>
+      </div>
+      <div style="display:flex;gap:5px">
+        <span class="alcohol-tag" style="background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3)">🌿 Gin</span>
+      </div>
+    </div>
+    <div class="card-image" style="background:linear-gradient(135deg,#0a1a28,#1e3a5f,#0d2137)" onclick="openStory(0)">
+      <div style="font-size:80px;filter:drop-shadow(0 0 40px rgba(16,185,129,.4))">🍸</div>
+      <div class="card-image-overlay">
+        <div class="cocktail-title">Tom Collins</div>
+        <div class="cocktail-desc">Refreshing, citrusy & endlessly drinkable ☀️🍋</div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <div class="card-stats">
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> 124</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> 38</div>
+        <div class="stat" style="color:#10b981"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> easy</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 4m</div>
+        <button class="save-btn" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.1)" onclick="saveRecipe(this)">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Save
+        </button>
+      </div>
+      <div class="food-pairing">
+        <span style="font-size:13px">🍽️</span>
+        <div><span class="food-label">Pairs with: </span><span class="food-text">Light salads, seafood, cucumber finger sandwiches</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2 -->
+  <div class="feed-card fade-in" style="animation-delay:.05s">
+    <div class="card-header">
+      <div class="card-user">
+        <div class="avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444);width:36px;height:36px;font-size:14px">W</div>
+        <div><div class="username">whiskey_tales</div><div class="time-ago">5h ago</div></div>
+      </div>
+      <div style="display:flex;gap:5px">
+        <span class="alcohol-tag" style="background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)">🥃 Bourbon</span>
+      </div>
+    </div>
+    <div class="card-image" style="background:linear-gradient(135deg,#1a0a0a,#3d1515,#1a0a0a)" onclick="openStory(1)">
+      <div style="font-size:80px;filter:drop-shadow(0 0 40px rgba(245,158,11,.4))">🥃</div>
+      <div class="card-image-overlay">
+        <div class="cocktail-title">Old Fashioned</div>
+        <div class="cocktail-desc">The timeless whiskey classic. Perfection in a glass 🥃</div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <div class="card-stats">
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> 287</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> 94</div>
+        <div class="stat" style="color:#f59e0b"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> medium</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 5m</div>
+        <button class="save-btn" style="background:rgba(139,92,246,.18);color:#c4b5fd;border:1px solid rgba(139,92,246,.4)" onclick="unsaveRecipe(this)">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:currentColor;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> 9/10
+        </button>
+      </div>
+      <div class="food-pairing">
+        <span style="font-size:13px">🍽️</span>
+        <div><span class="food-label">Pairs with: </span><span class="food-text">Dark chocolate, grilled steak, smoked almonds</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3 -->
+  <div class="feed-card fade-in" style="animation-delay:.1s">
+    <div class="card-header">
+      <div class="card-user">
+        <div class="avatar" style="background:linear-gradient(135deg,#fb923c,#f59e0b);width:36px;height:36px;font-size:14px">T</div>
+        <div><div class="username">tropical_vibes</div><div class="time-ago">1d ago</div></div>
+      </div>
+      <div style="display:flex;gap:5px">
+        <span class="alcohol-tag" style="background:rgba(251,146,60,.15);color:#fb923c;border:1px solid rgba(251,146,60,.3)">🌴 Rum</span>
+      </div>
+    </div>
+    <div class="card-image" style="background:linear-gradient(135deg,#0a1500,#1a2e00,#0a1500)" onclick="openStory(2)">
+      <div style="font-size:80px;filter:drop-shadow(0 0 40px rgba(251,146,60,.4))">🌴</div>
+      <div class="card-image-overlay">
+        <div class="cocktail-title">Piña Colada</div>
+        <div class="cocktail-desc">Tropical paradise in a glass 🌴🍍</div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <div class="card-stats">
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> 156</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> 52</div>
+        <div class="stat" style="color:#10b981"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> easy</div>
+        <div class="stat"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 5m</div>
+        <button class="save-btn" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.1)" onclick="saveRecipe(this)">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Save
+        </button>
+      </div>
+      <div class="food-pairing">
+        <span style="font-size:13px">🍽️</span>
+        <div><span class="food-label">Pairs with: </span><span class="food-text">Grilled shrimp, coconut rice, tropical fruit skewers</span></div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ========== EXPLORE SCREEN ========== -->
+<div id="screen-explore" class="screen page">
+  <div class="top-bar" style="flex-direction:column;gap:10px;align-items:stretch;padding:12px 16px">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="explore-search" class="form-input search-input" placeholder="Search cocktails..." style="margin:0" oninput="onExploreSearch(this.value)">
+    </div>
+    <div class="filter-scroll" id="explore-filters">
+      <!-- built dynamically by buildExploreFilters() -->
+    </div>
+  </div>
+  <!-- Grid view -->
+  <div id="explore-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px"></div>
+  <!-- List view (filter/search) -->
+  <div id="explore-list" style="display:none">
+    <div class="feed-card fade-in">
+      <div class="card-header">
+        <div class="card-user">
+          <div class="avatar" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);width:36px;height:36px;font-size:14px">G</div>
+          <div><div class="username">gin_adventures</div><div class="time-ago">3h ago</div></div>
+        </div>
+        <span class="alcohol-tag" style="background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3)">🌿 Gin</span>
+      </div>
+      <div class="card-image" style="background:linear-gradient(135deg,#081a10,#0e3020)" onclick="openStory(3)">
+        <div style="font-size:80px;filter:drop-shadow(0 0 40px rgba(16,185,129,.4))">🌿</div>
+        <div class="card-image-overlay"><div class="cocktail-title">Gin Basil Smash</div><div class="cocktail-desc">Fresh, herbaceous, stunning green 🌿</div></div>
+      </div>
+      <div class="card-actions">
+        <div class="card-stats">
+          <div class="stat">👁 89</div><div class="stat">🔖 31</div>
+          <button class="save-btn" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.1)" onclick="saveRecipe(this)">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== RECIPE BOOK SCREEN ========== -->
+<div id="screen-recipes" class="screen page">
+  <div class="top-bar" style="flex-direction:column;align-items:stretch;gap:10px;padding:12px 16px 6px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:#a78bfa;fill:none;stroke-width:2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span id="rb-page-title" style="font-size:17px;font-weight:700">Recipe Book</span>
+      </div>
+      <button id="rb-mybar-btn" onclick="openBar()" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.25);color:#c4b5fd;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+        My Bar
+      </button>
+    </div>
+    <!-- Bar filter active banner -->
+    <div style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="openBar()">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#a78bfa;fill:none;stroke-width:2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+      <span id="rb-bar-banner" style="font-size:13px;color:#c4b5fd;font-weight:500;flex:1">✓ Showing recipes I can make</span>
+      <span style="background:rgba(139,92,246,.3);color:#a78bfa;font-size:11px;padding:2px 8px;border-radius:999px">3 spirits</span>
+    </div>
+    <!-- Alcohol tabs -->
+    <div class="tabs-row" style="padding:0;margin:0;scrollbar-width:none">
+      <button class="filter-chip" style="background:rgba(139,92,246,.25);color:#a78bfa;border-color:rgba(139,92,246,.4)" onclick="selectTab(this)">🍸 All (5)</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🌿 Gin (2)</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🥃 Whiskey (2)</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🫙 Vodka (1)</button>
+    </div>
+  </div>
+
+  <div style="padding:12px 14px">
+    <!-- Gin section -->
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px">
+      <span style="font-size:18px">🌿</span>
+      <span style="font-size:13px;font-weight:700;color:#34d399">Gin</span>
+      <span style="font-size:11px;color:rgba(255,255,255,.25)">(2)</span>
+    </div>
+
+    <!-- Recipe card 1 -->
+    <div class="recipe-book-card">
+      <div class="rb-header" onclick="toggleExpand(this)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div>
+            <div class="rb-name">Tom Collins</div>
+            <div class="rb-sub">by gin_adventures · 2d ago</div>
+          </div>
+          <div class="rating-badge">⭐ 8<span style="color:rgba(251,191,36,.4);font-size:11px">/10</span></div>
+        </div>
+        <div class="rb-tags">
+          <span class="alcohol-tag" style="background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)">🌿 Gin</span>
+        </div>
+        <div class="rb-meta">
+          <span>⚡ easy</span><span>⏱️ 4 min</span><span>5 ingredients</span>
+        </div>
+      </div>
+      <div style="height:1px;background:rgba(255,255,255,.05)"></div>
+      <button style="width:100%;padding:9px 16px;background:none;border:none;color:rgba(255,255,255,.35);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleExpand(this.closest('.recipe-book-card').querySelector('.rb-header'))">
+        <span>View recipe</span>
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="rb-expand" id="expand1">
+        <div class="rb-body">
+          <div class="recipe-section-title" id="sv-ingredients-title" style="color:#a78bfa">Ingredients</div>
+          <div class="ingredient-row"><span class="ing-name">London Dry Gin</span><span class="ing-amount">45 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Fresh lemon juice</span><span class="ing-amount">30 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Simple syrup</span><span class="ing-amount">15 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Club soda</span><span class="ing-amount">60 ml</span></div>
+          <div class="recipe-section-title" id="sv-instructions-title" style="color:#ec4899;margin-top:14px">Instructions</div>
+          <div class="instruction-row"><span class="step-num">1.</span><span class="step-text">Fill a highball glass with ice</span></div>
+          <div class="instruction-row"><span class="step-num">2.</span><span class="step-text">Add gin, lemon juice, and simple syrup</span></div>
+          <div class="instruction-row"><span class="step-num">3.</span><span class="step-text">Top with club soda and garnish with lemon</span></div>
+          <div class="pairing-box">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-size:13px">🍽️</span>
+              <span id="sv-pairing-title" style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.06em">Snack Pairing</span>
+            </div>
+            <span style="font-size:12px;color:rgba(255,255,255,.6)">Light salads, seafood, cucumber finger sandwiches</span>
+          </div>
+        </div>
+      </div>
+      <div class="rb-actions">
+        <button class="rb-action-btn" style="background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)">⭐ Rate: 8/10</button>
+        <button class="rb-action-btn" style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);flex:0.5">🗑️</button>
+      </div>
+    </div>
+
+    <!-- Whiskey section -->
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px">
+      <span style="font-size:18px">🥃</span>
+      <span style="font-size:13px;font-weight:700;color:#fbbf24">Whiskey</span>
+      <span style="font-size:11px;color:rgba(255,255,255,.25)">(2)</span>
+    </div>
+
+    <!-- Recipe card 2 -->
+    <div class="recipe-book-card">
+      <div class="rb-header">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div>
+            <div class="rb-name">Old Fashioned</div>
+            <div class="rb-sub">by whiskey_tales · 5d ago</div>
+          </div>
+          <div class="rating-badge">⭐ 9<span style="color:rgba(251,191,36,.4);font-size:11px">/10</span></div>
+        </div>
+        <div class="rb-tags">
+          <span class="alcohol-tag" style="background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.25)">🥃 Bourbon</span>
+        </div>
+        <div class="rb-meta"><span>⚡ medium</span><span>⏱️ 5 min</span><span>5 ingredients</span></div>
+      </div>
+      <div class="rb-actions" style="border-top:1px solid rgba(255,255,255,.05)">
+        <button class="rb-action-btn" style="background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)">⭐ Rate: 9/10</button>
+        <button class="rb-action-btn" style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);flex:0.5">🗑️</button>
+      </div>
+    </div>
+
+    <!-- Vodka section -->
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px">
+      <span style="font-size:18px">🫙</span>
+      <span style="font-size:13px;font-weight:700;color:#93c5fd">Vodka</span>
+      <span style="font-size:11px;color:rgba(255,255,255,.25)">(1)</span>
+    </div>
+    <div class="recipe-book-card">
+      <div class="rb-header">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div>
+            <div class="rb-name">Espresso Martini</div>
+            <div class="rb-sub">by cocktail_master · 1w ago</div>
+          </div>
+          <div class="rating-badge">⭐ 7<span style="color:rgba(251,191,36,.4);font-size:11px">/10</span></div>
+        </div>
+        <div class="rb-tags">
+          <span class="alcohol-tag" style="background:rgba(96,165,250,.12);color:#93c5fd;border-color:rgba(96,165,250,.25)">🫙 Vodka</span>
+          <span class="alcohol-tag" style="background:rgba(120,53,15,.3);color:#d97706;border-color:rgba(120,53,15,.5)">☕ Coffee</span>
+        </div>
+        <div class="rb-meta"><span>⚡ medium</span><span>⏱️ 7 min</span><span>4 ingredients</span></div>
+      </div>
+      <div class="rb-actions" style="border-top:1px solid rgba(255,255,255,.05)">
+        <button class="rb-action-btn" style="background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)">⭐ Rate: 7/10</button>
+        <button class="rb-action-btn" style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);flex:0.5">🗑️</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PROFILE SCREEN ========== -->
+<div id="screen-profile" class="screen page">
+  <div class="top-bar">
+    <div style="width:28px"></div>
+    <span style="font-weight:700">cocktail_master</span>
+    <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:rgba(255,255,255,.4);fill:none;stroke-width:1.8;cursor:pointer"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  </div>
+  <div style="padding:20px 20px 16px">
+    <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:16px">
+      <label for="profile-pic-input" style="cursor:pointer;position:relative;flex-shrink:0" title="Change photo">
+        <div id="profile-avatar-wrap" class="profile-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);overflow:hidden;position:relative">
+          <img id="profile-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0"/>
+          <span id="profile-avatar-letter">C</span>
+        </div>
+        <div style="position:absolute;bottom:0;right:0;background:#8b5cf6;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid #080810">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#fff;fill:none;stroke-width:2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <input id="profile-pic-input" type="file" accept="image/*" style="display:none" onchange="handleProfilePic(this)"/>
+      </label>
+      <div style="flex:1">
+        <div style="font-size:20px;font-weight:800;color:#fff">cocktail_master</div>
+        <div id="profile-bio" style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">Professional mixologist 🍹 | Creating liquid art</div>
+        <button id="profile-edit-bio" style="margin-top:6px;font-size:12px;color:#a78bfa;background:none;border:none;cursor:pointer;padding:0">Edit bio</button>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-cell"><div class="stat-num">8</div><div id="profile-stat-recipes" class="stat-label">Recipes</div></div>
+      <div class="stat-cell"><div class="stat-num">247</div><div id="profile-stat-followers" class="stat-label">Followers</div></div>
+      <div class="stat-cell"><div class="stat-num">63</div><div id="profile-stat-following" class="stat-label">Following</div></div>
+    </div>
+    <button onclick="openBar()" style="width:100%;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.25);color:#c4b5fd;border-radius:16px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+      <span id="profile-mybar-btn">Manage My Bar</span>
+    </button>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,.05)">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#a78bfa;fill:none;stroke-width:2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <span id="profile-rb-title" style="font-size:14px;font-weight:700">Recipe Book</span>
+      <span style="font-size:13px;color:rgba(255,255,255,.25);margin-left:auto">8 recipes</span>
+    </div>
+    <div class="tabs-row" style="padding:0 16px 10px;scrollbar-width:none">
+      <button class="filter-chip" style="background:rgba(139,92,246,.25);color:#a78bfa;border-color:rgba(139,92,246,.4)">🍸 All</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🌿 Gin (3)</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🥃 Whiskey (2)</button>
+      <button class="filter-chip" style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.07)" onclick="selectTab(this)">🌴 Rum (2)</button>
+    </div>
+    <div style="padding:0 14px">
+      <div class="recipe-book-card">
+        <div class="rb-header">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div><div class="rb-name">Classic Negroni</div><div class="rb-sub">by cocktail_master · 3d ago</div></div>
+            <div class="rating-badge">⭐ 10<span style="color:rgba(251,191,36,.4);font-size:11px">/10</span></div>
+          </div>
+          <div class="rb-tags">
+            <span class="alcohol-tag" style="background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)">🌿 Gin</span>
+            <span class="alcohol-tag" style="background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)">🍊 Campari</span>
+          </div>
+          <div class="rb-meta"><span>⚡ easy</span><span>⏱️ 3 min</span><span>4 ingredients</span></div>
+        </div>
+        <div class="rb-actions" style="border-top:1px solid rgba(255,255,255,.05)">
+          <button class="rb-action-btn" style="background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)">⭐ Rate: 10/10</button>
+          <button class="rb-action-btn" style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);flex:0.5">🗑️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== STORY VIEWER ======== -->
+<div id="story-overlay" class="story-overlay">
+  <div class="story-bg" id="story-bg"></div>
+  <div class="progress-bars">
+    <div class="prog-bar"><div class="prog-fill progressing" id="prog-fill" style="width:0%"></div></div>
+  </div>
+  <div class="story-header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="avatar" id="story-avatar" style="width:36px;height:36px;font-size:14px;background:linear-gradient(135deg,#06b6d4,#3b82f6)">G</div>
+      <div>
+        <div style="font-size:13px;font-weight:600" id="story-username">gin_adventures</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.45)" id="story-time">2h ago</div>
+      </div>
+    </div>
+    <button class="close-btn" onclick="closeStory()">✕</button>
+  </div>
+
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="closeStory()">
+    <div id="story-emoji" style="font-size:100px;filter:drop-shadow(0 0 50px rgba(139,92,246,.5))">🍸</div>
+  </div>
+
+  <div class="story-content">
+    <div class="story-tags" id="story-tags">
+      <span class="alcohol-tag" style="background:rgba(16,185,129,.2);color:#34d399;border-color:rgba(16,185,129,.4);font-size:11px">🌿 Gin</span>
+    </div>
+    <div class="story-title" id="story-title">Tom Collins</div>
+    <div class="story-meta">
+      <span style="color:#10b981;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>easy</span>
+      <span style="color:rgba(255,255,255,.4);display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>4 min</span>
+      <span style="color:rgba(255,255,255,.3)">124 views</span>
+    </div>
+
+    <div class="recipe-toggle">
+      <button class="recipe-toggle-btn" onclick="toggleRecipe()">
+        <span id="recipe-toggle-text">📋 View Full Recipe</span>
+        <svg id="recipe-chevron" viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .3s"><polyline points="18 15 12 9 6 15"/></svg>
+      </button>
+      <div id="recipe-expand" style="max-height:0;overflow:hidden;transition:max-height .35s ease">
+        <div class="recipe-body">
+          <div class="recipe-section-title" style="color:#a78bfa">Ingredients</div>
+          <div class="ingredient-row"><span class="ing-name">London Dry Gin</span><span class="ing-amount">45 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Fresh lemon juice</span><span class="ing-amount">30 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Simple syrup</span><span class="ing-amount">15 ml</span></div>
+          <div class="ingredient-row"><span class="ing-name">Club soda</span><span class="ing-amount">60 ml</span></div>
+          <div class="recipe-section-title" style="color:#ec4899;margin-top:14px">Instructions</div>
+          <div class="instruction-row"><span class="step-num">1.</span><span class="step-text">Fill a highball glass with ice</span></div>
+          <div class="instruction-row"><span class="step-num">2.</span><span class="step-text">Add gin, lemon juice, and simple syrup</span></div>
+          <div class="instruction-row"><span class="step-num">3.</span><span class="step-text">Stir briefly, top with club soda</span></div>
+          <div class="instruction-row"><span class="step-num">4.</span><span class="step-text">Garnish with lemon slice and enjoy!</span></div>
+          <div class="pairing-box">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+              <span>🍽️</span>
+              <span style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.06em">Snack Pairing</span>
+            </div>
+            <span style="font-size:12px;color:rgba(255,255,255,.65)">Light salads, seafood, cucumber finger sandwiches</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button id="story-save-btn" class="story-save-btn" onclick="storySave()" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff">
+      🔖 <span id="sv-save-text">Save to Recipe Book</span>
+    </button>
+  </div>
+
+  <!-- Rating modal -->
+  <div id="rating-modal" style="display:none;position:absolute;bottom:0;left:0;right:0;background:#111120;border-top:1px solid rgba(255,255,255,.1);border-radius:24px 24px 0 0;padding:20px;z-index:20">
+    <div style="text-align:center;margin-bottom:14px">
+      <div id="rating-title" style="font-size:16px;font-weight:700;color:#fff">Rate this cocktail</div>
+      <div id="rating-sub" style="font-size:12px;color:rgba(255,255,255,.35);margin-top:3px">How much did you love it?</div>
+    </div>
+    <div class="rating-grid">
+      <button class="rating-num" onclick="confirmRating(this)">1</button><button class="rating-num" onclick="confirmRating(this)">2</button>
+      <button class="rating-num" onclick="confirmRating(this)">3</button><button class="rating-num" onclick="confirmRating(this)">4</button>
+      <button class="rating-num" onclick="confirmRating(this)">5</button><button class="rating-num" onclick="confirmRating(this)">6</button>
+      <button class="rating-num" onclick="confirmRating(this)">7</button><button class="rating-num" onclick="confirmRating(this)">8</button>
+      <button class="rating-num" onclick="confirmRating(this)">9</button><button class="rating-num" onclick="confirmRating(this)">10</button>
+    </div>
+    <button id="rating-skip" onclick="confirmRating(null)" style="width:100%;padding:10px;background:none;border:none;color:rgba(255,255,255,.3);font-size:13px;cursor:pointer">Skip rating</button>
+  </div>
+</div>
+
+<!-- ======== MY BAR OVERLAY ======== -->
+<div id="bar-overlay" class="bar-overlay" onclick="closeBar(event)">
+  <div class="bar-sheet slide-up">
+    <!-- Header -->
+    <div class="bar-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#a78bfa;fill:none;stroke-width:2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+        <span id="bar-sheet-title" style="font-weight:700;font-size:15px">My Bar</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="bar-count" style="font-size:12px;color:rgba(255,255,255,.35);background:rgba(139,92,246,.2);padding:2px 10px;border-radius:999px">3 selected</span>
+        <button id="bar-remove-btn" onclick="toggleRemoveMode()" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:11px;font-weight:600;cursor:pointer">
+          🗑️ <span id="bar-remove-label">הסר</span>
+        </button>
+      </div>
+    </div>
+    <!-- Hint -->
+    <p id="bar-hint" style="padding:10px 20px 2px;font-size:13px;color:rgba(255,255,255,.35)">Tell us what's in your bar and we'll show you cocktails you can make right now 🍹</p>
+    <!-- Add form -->
+    <div id="bar-add-form" style="display:none;padding:10px 20px 12px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="bar-new-emoji" maxlength="2" value="🍸" style="width:48px;text-align:center;font-size:18px;padding:8px 4px;flex-shrink:0"/>
+        <input id="bar-new-label" placeholder="שם המשקה" style="flex:1"/>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <div onclick="selectBarColor('#8b5cf6',this)" data-color="#8b5cf6" style="width:22px;height:22px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:2px solid white;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#ec4899',this)" data-color="#ec4899" style="width:22px;height:22px;border-radius:50%;background:#ec4899;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#10b981',this)" data-color="#10b981" style="width:22px;height:22px;border-radius:50%;background:#10b981;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#3b82f6',this)" data-color="#3b82f6" style="width:22px;height:22px;border-radius:50%;background:#3b82f6;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#f59e0b',this)" data-color="#f59e0b" style="width:22px;height:22px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#ef4444',this)" data-color="#ef4444" style="width:22px;height:22px;border-radius:50%;background:#ef4444;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#06b6d4',this)" data-color="#06b6d4" style="width:22px;height:22px;border-radius:50%;background:#06b6d4;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+        <div onclick="selectBarColor('#f97316',this)" data-color="#f97316" style="width:22px;height:22px;border-radius:50%;background:#f97316;cursor:pointer;border:2px solid transparent;flex-shrink:0"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="addCustomDrink()" style="flex:1;padding:8px;border-radius:12px;background:rgba(139,92,246,.2);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);font-weight:600;font-size:13px;cursor:pointer">הוסף</button>
+        <button onclick="document.getElementById('bar-add-form').style.display='none'" style="padding:8px 16px;border-radius:12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:none;font-size:13px;cursor:pointer">ביטול</button>
+      </div>
+    </div>
+    <!-- Pills -->
+    <div class="bar-grid" id="bar-grid">
+      <div class="bar-item" data-color="#10b981" data-en="🌿 Gin" data-he="🌿 ג'ין" data-selected="1" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:#34d399" onclick="toggleBar(this)">🌿 Gin ✓</div>
+      <div class="bar-item" data-color="#f59e0b" data-en="🥃 Whiskey" data-he="🥃 וויסקי" data-selected="1" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.35);color:#fbbf24" onclick="toggleBar(this)">🥃 Whiskey ✓</div>
+      <div class="bar-item" data-color="#d97706" data-en="🥃 Bourbon" data-he="🥃 בורבון" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🥃 Bourbon</div>
+      <div class="bar-item" data-color="#60a5fa" data-en="🫙 Vodka" data-he="🫙 וודקה" data-selected="1" style="background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.35);color:#93c5fd" onclick="toggleBar(this)">🫙 Vodka ✓</div>
+      <div class="bar-item" data-color="#fb923c" data-en="🌴 Rum" data-he="🌴 רום" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🌴 Rum</div>
+      <div class="bar-item" data-color="#a3e635" data-en="🌵 Tequila" data-he="🌵 טקילה" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🌵 Tequila</div>
+      <div class="bar-item" data-color="#86efac" data-en="🌿 Mezcal" data-he="🌿 מזקל" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🌿 Mezcal</div>
+      <div class="bar-item" data-color="#b45309" data-en="🍷 Brandy" data-he="🍷 ברנדי" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍷 Brandy</div>
+      <div class="bar-item" data-color="#ef4444" data-en="🍊 Campari" data-he="🍊 קמפרי" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍊 Campari</div>
+      <div class="bar-item" data-color="#c084fc" data-en="🫗 Vermouth" data-he="🫗 ורמוט" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🫗 Vermouth</div>
+      <div class="bar-item" data-color="#78350f" data-en="☕ Coffee Liq." data-he="☕ ליקר קפה" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">☕ Coffee Liq.</div>
+      <div class="bar-item" data-color="#fde68a" data-en="🥥 Coconut" data-he="🥥 קוקוס" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🥥 Coconut</div>
+      <div class="bar-item" data-color="#9f1239" data-en="🍷 Wine" data-he="🍷 יין" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍷 Wine</div>
+      <div class="bar-item" data-color="#fbbf24" data-en="🍺 Beer" data-he="🍺 בירה" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍺 Beer</div>
+      <div class="bar-item" data-color="#e879f9" data-en="🍬 Liqueur" data-he="🍬 ליקר" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍬 Liqueur</div>
+      <div class="bar-item" data-color="#94a3b8" data-en="🍸 Other" data-he="🍸 אחר" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.55)" onclick="toggleBar(this)">🍸 Other</div>
+      <!-- Add drink button (always last) -->
+      <div id="bar-add-btn" onclick="toggleAddDrinkForm()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:1px dashed rgba(255,255,255,.2);background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;width:fit-content">
+        ＋ <span id="bar-add-label">הוסף משקה</span>
+      </div>
+    </div>
+    <div class="bar-footer">
+      <button id="bar-save-btn" class="btn-grad" onclick="saveBar()">שמור את הבר שלי</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== UPLOAD OVERLAY ======== -->
+<div id="upload-overlay" class="upload-overlay" onclick="closeUpload(event)">
+  <div class="upload-sheet slide-up" onclick="e=>e.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <button onclick="closeUpload()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer">✕</button>
+      <span style="font-weight:700">New Cocktail Story</span>
+      <div style="display:flex;gap:5px">
+        <div style="width:8px;height:8px;border-radius:50%;background:#8b5cf6"></div>
+        <div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15)"></div>
+        <div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15)"></div>
+      </div>
+    </div>
+    <div style="padding:18px 20px;space-y:12px">
+      <p style="font-size:12px;color:rgba(255,255,255,.3);margin-bottom:14px">Step 1 of 3 — Basic info</p>
+      <div style="width:100%;aspect-ratio:4/3;background:rgba(255,255,255,.03);border:2px dashed rgba(255,255,255,.08);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;cursor:pointer">
+        <span style="font-size:36px">📷</span>
+        <span style="font-size:13px;color:rgba(255,255,255,.25)">Add photo (optional)</span>
+      </div>
+      <input class="form-input" placeholder="Cocktail name *" style="margin-bottom:10px">
+      <textarea class="form-input" placeholder="Description..." rows="2" style="resize:none;margin-bottom:12px"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:5px">Difficulty</div>
+          <select style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:10px 12px;font-size:13px">
+            <option>Easy</option><option selected>Medium</option><option>Hard</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:5px">Prep time (min)</div>
+          <input class="form-input" type="number" value="5" style="margin:0">
+        </div>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:8px">Alcohol types *</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px">
+        <span style="background:rgba(16,185,129,.2);color:#34d399;border:1px solid rgba(16,185,129,.4);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer">🌿 Gin</span>
+        <span style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer">🥃 Whiskey</span>
+        <span style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer">🫙 Vodka</span>
+        <span style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer">🌴 Rum</span>
+        <span style="background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer">🌵 Tequila</span>
+      </div>
+      <button class="btn-grad">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== BOTTOM NAV ======== -->
+<nav class="bottom-nav">
+  <div class="nav-item active" id="nav-home" onclick="goTo('home')">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="nav-label">Home</span>
+  </div>
+  <div class="nav-item" id="nav-explore" onclick="goTo('explore')">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span class="nav-label">Explore</span>
+  </div>
+  <div class="nav-item" id="nav-recipes" onclick="goTo('recipes')">
+    <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span class="nav-label">Recipes</span>
+  </div>
+  <div class="nav-item" id="nav-profile" onclick="goTo('profile')">
+    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span class="nav-label">Profile</span>
+  </div>
+</nav>
+
+</div><!-- end #app -->
+
+<script>
+// ===== LANGUAGE SYSTEM =====
+const translations={
+  en:{yourStory:'Your Cocktail',pairsWith:'Pairs with:',save:'Save',saved:'Saved',viewFullRecipe:'📋 View Full Recipe',saveToRecipeBook:'Save to Recipe Book',ingredients:'Ingredients',instructions:'Instructions',snackPairing:'Snack Pairing',rateCocktail:'Rate this cocktail',howMuchLoved:'How much did you love it?',skipRating:'Skip rating',recipeBook:'Recipe Book',myBar:'My Bar',manageMyBar:'Manage My Bar',showingBarRecipes:'✓ Showing recipes I can make',filterByBar:"Filter by what's in my bar",viewRecipe:'View recipe',remove:'Remove',rate:'Rate',followers:'Followers',following:'Following',savedRecipesCount:'Recipes',follow:'Follow',myBarTitle:'My Bar',myBarHint:"Tell us what's in your bar — we'll show you cocktails you can make right now 🍹",saveBar:'Save My Bar',searchPlaceholder:'Search cocktails...',popular:'Popular cocktails',signIn:'Sign In',signUp:'Sign Up',tagline:'The cocktail community',home:'Home',explore:'Explore',recipes:'Recipes',profile:'Profile',spirits:'spirits',
+    profileBio:'Professional mixologist 🍹 | Creating liquid art',editBio:'Edit bio',
+    statRecipes:'Recipes',statFollowers:'Followers',statFollowing:'Following'},
+  he:{yourStory:'הקוקטיל שלך',pairsWith:'משתלב עם:',save:'שמור',saved:'נשמר',viewFullRecipe:'📋 צפה במתכון המלא',saveToRecipeBook:'שמור לספר המתכונים',ingredients:'מצרכים',instructions:'הוראות הכנה',snackPairing:'המלצת נשנוש',rateCocktail:'דרג את הקוקטייל',howMuchLoved:'כמה אהבת אותו?',skipRating:'דלג על הדירוג',recipeBook:'ספר מתכונים',myBar:'הבר שלי',manageMyBar:'נהל את הבר שלי',showingBarRecipes:'✓ מציג מתכונים שאני יכול להכין',filterByBar:'סנן לפי מה שיש לי בבית',viewRecipe:'צפה במתכון',remove:'הסר',rate:'דרג',followers:'עוקבים',following:'עוקב אחרי',savedRecipesCount:'מתכונים',follow:'עקוב',myBarTitle:'הבר שלי',myBarHint:'ספר לנו מה יש לך בבר ונציג לך קוקטיילים שאתה יכול להכין עכשיו 🍹',saveBar:'שמור את הבר שלי',searchPlaceholder:'חפש קוקטיילים...',popular:'קוקטיילים פופולריים',signIn:'כניסה',signUp:'הרשמה',tagline:'קהילת הקוקטיילים',home:'בית',explore:'גלה',recipes:'מתכונים',profile:'פרופיל',spirits:'משקאות',
+    profileBio:'מיקסולוג מקצועי 🍹 | יוצר אמנות נוזלית',editBio:'ערוך ביו',
+    statRecipes:'מתכונים',statFollowers:'עוקבים',statFollowing:'עוקב אחרי'},
+};
+let currentLang='en';
+function t(k){return translations[currentLang][k]||translations.en[k]||k;}
+
+function applyLang(){
+  const isHe=currentLang==='he';
+  document.body.dir=isHe?'rtl':'ltr';
+  // Header lang button
+  const btn=document.getElementById('lang-btn');
+  if(btn)btn.innerHTML='🌐';
+  // Nav labels
+  const navLabels=document.querySelectorAll('.nav-label');
+  const navKeys=['home','explore','recipes','profile'];
+  navLabels.forEach((el,i)=>{if(navKeys[i])el.textContent=t(navKeys[i]);});
+  // Your Story label
+  document.querySelectorAll('.story-name').forEach((el,i)=>{if(i===0)el.textContent=t('yourStory');});
+  // Recipe book title
+  document.querySelectorAll('[data-t]').forEach(el=>{ el.textContent=t(el.dataset.t); });
+  // Feed card "Pairs with"
+  document.querySelectorAll('.food-label').forEach(el=>{el.textContent=t('pairsWith')+' ';});
+  // Save buttons in feed
+  document.querySelectorAll('.save-btn').forEach(el=>{
+    if(el.dataset.saved==='1') el.innerHTML=`<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:currentColor;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> ${t('saved')}`;
+    else el.innerHTML=`<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> ${t('save')}`;
+  });
+  // Story viewer
+  document.getElementById('recipe-toggle-text').textContent=t('viewFullRecipe');
+  document.getElementById('sv-save-text').textContent=storySaved?t('saved'):t('saveToRecipeBook');
+  document.getElementById('sv-ingredients-title').textContent=t('ingredients');
+  document.getElementById('sv-instructions-title').textContent=t('instructions');
+  document.getElementById('sv-pairing-title').textContent=t('snackPairing');
+  document.getElementById('rating-title').textContent=t('rateCocktail');
+  document.getElementById('rating-sub').textContent=t('howMuchLoved');
+  document.getElementById('rating-skip').textContent=t('skipRating');
+  // Recipe book page
+  document.getElementById('rb-page-title').textContent=t('recipeBook');
+  document.getElementById('rb-mybar-btn').textContent=`⊞ ${t('myBar')}`;
+  document.getElementById('rb-bar-banner').textContent=t('showingBarRecipes');
+  // My bar sheet
+  document.getElementById('bar-sheet-title').textContent=t('myBarTitle');
+  document.getElementById('bar-hint').textContent=t('myBarHint');
+  document.getElementById('bar-save-btn').textContent=t('saveBar');
+  // Bar items - translate labels
+  document.querySelectorAll('#bar-grid .bar-item').forEach(el=>{
+    const base=el.dataset[currentLang]||el.dataset.en;
+    const isSelected=el.dataset.selected==='1';
+    el.textContent=isSelected?base+' ✓':base;
+  });
+  // Bar remove / add labels
+  const barRemoveLabel=document.getElementById('bar-remove-label');
+  if(barRemoveLabel)barRemoveLabel.textContent=currentLang==='he'?'הסר':'Remove';
+  const barAddLabel=document.getElementById('bar-add-label');
+  if(barAddLabel)barAddLabel.textContent=currentLang==='he'?'הוסף משקה':'Add Drink';
+  const barNewLabel=document.getElementById('bar-new-label');
+  if(barNewLabel)barNewLabel.placeholder=currentLang==='he'?'שם המשקה':'Drink name';
+  if(!barRemoveMode){document.getElementById('bar-save-btn').textContent=t('saveBar');}
+  updateBarCount();
+  // Profile page
+  document.getElementById('profile-mybar-btn').innerHTML=`⊞ ${t('manageMyBar')}`;
+  document.getElementById('profile-rb-title').textContent=t('recipeBook');
+  document.getElementById('profile-bio').textContent=t('profileBio');
+  document.getElementById('profile-edit-bio').textContent=t('editBio');
+  document.getElementById('profile-stat-recipes').textContent=t('statRecipes');
+  document.getElementById('profile-stat-followers').textContent=t('statFollowers');
+  document.getElementById('profile-stat-following').textContent=t('statFollowing');
+}
+
+function toggleLang(){
+  currentLang=currentLang==='en'?'he':'en';
+  applyLang();
+  buildExploreFilters();
+  buildExploreGrid();
+}
+
+// ===== ALCOHOL TYPES MASTER LIST =====
+const ALCOHOL_TYPES=[
+  {key:'gin',       emoji:'🌿',label:'Gin',      labelHe:"ג'ין",  color:'#10b981'},
+  {key:'whiskey',   emoji:'🥃',label:'Whiskey',  labelHe:'וויסקי',color:'#f59e0b'},
+  {key:'bourbon',   emoji:'🥃',label:'Bourbon',  labelHe:'בורבון',color:'#d97706'},
+  {key:'vodka',     emoji:'🫙',label:'Vodka',    labelHe:'וודקה', color:'#60a5fa'},
+  {key:'rum',       emoji:'🌴',label:'Rum',      labelHe:'רום',   color:'#fb923c'},
+  {key:'tequila',   emoji:'🌵',label:'Tequila',  labelHe:'טקילה', color:'#a3e635'},
+  {key:'mezcal',    emoji:'🌿',label:'Mezcal',   labelHe:'מזקל',  color:'#86efac'},
+  {key:'brandy',    emoji:'🍷',label:'Brandy',   labelHe:'ברנדי', color:'#b45309'},
+  {key:'campari',   emoji:'🍊',label:'Campari',  labelHe:'קמפרי', color:'#ef4444'},
+  {key:'vermouth',  emoji:'🫗',label:'Vermouth', labelHe:'ורמוט', color:'#c084fc'},
+  {key:'coffee_liqueur',emoji:'☕',label:'Coffee Liq.',labelHe:'ליקר קפה',color:'#78350f'},
+  {key:'coconut',   emoji:'🥥',label:'Coconut',  labelHe:'קוקוס', color:'#fde68a'},
+  {key:'wine',      emoji:'🍷',label:'Wine',     labelHe:'יין',   color:'#9f1239'},
+  {key:'beer',      emoji:'🍺',label:'Beer',     labelHe:'בירה',  color:'#fbbf24'},
+  {key:'liqueur',   emoji:'🍬',label:'Liqueur',  labelHe:'ליקר',  color:'#e879f9'},
+  {key:'other',     emoji:'🍸',label:'Other',    labelHe:'אחר',   color:'#94a3b8'},
+];
+
+const stories=[
+  {username:'gin_adventures',avatar:'G',gradient:'linear-gradient(135deg,#06b6d4,#3b82f6)',bg:'linear-gradient(160deg,#030d1a,#0a2040)',emoji:'🍸',title:'Tom Collins',tag:'🌿 Gin',tagColor:'#34d399',tagBg:'rgba(16,185,129,.2)',tagBorder:'rgba(16,185,129,.4)',diff:'easy',diffColor:'#10b981',time:'2h ago',views:124,alcoholKeys:['gin']},
+  {username:'whiskey_tales',avatar:'W',gradient:'linear-gradient(135deg,#f59e0b,#ef4444)',bg:'linear-gradient(160deg,#1a0800,#3d1800)',emoji:'🥃',title:'Old Fashioned',tag:'🥃 Bourbon',tagColor:'#fbbf24',tagBg:'rgba(245,158,11,.2)',tagBorder:'rgba(245,158,11,.4)',diff:'medium',diffColor:'#f59e0b',time:'5h ago',views:287,alcoholKeys:['bourbon','whiskey']},
+  {username:'tropical_vibes',avatar:'T',gradient:'linear-gradient(135deg,#fb923c,#f59e0b)',bg:'linear-gradient(160deg,#0a1500,#1a2e00)',emoji:'🌴',title:'Piña Colada',tag:'🌴 Rum',tagColor:'#fb923c',tagBg:'rgba(251,146,60,.2)',tagBorder:'rgba(251,146,60,.4)',diff:'easy',diffColor:'#10b981',time:'1d ago',views:156,alcoholKeys:['rum','coconut']},
+  {username:'gin_adventures',avatar:'G',gradient:'linear-gradient(135deg,#06b6d4,#3b82f6)',bg:'linear-gradient(160deg,#061a0a,#0a3015)',emoji:'🌿',title:'Gin Basil Smash',tag:'🌿 Gin',tagColor:'#34d399',tagBg:'rgba(16,185,129,.2)',tagBorder:'rgba(16,185,129,.4)',diff:'medium',diffColor:'#f59e0b',time:'3h ago',views:89,alcoholKeys:['gin']},
+];
+let recipeOpen=false,storySaved=false,currentStoryIdx=0;
+
+// ===== PREFERENCE ENGINE =====
+function getPrefs(){
+  try{return JSON.parse(localStorage.getItem('mix_prefs')||'{}');}catch{return{};}
+}
+function savePrefs(p){localStorage.setItem('mix_prefs',JSON.stringify(p));}
+function trackInteraction(keys,weight){
+  if(!keys||!keys.length)return;
+  const p=getPrefs();
+  keys.forEach(k=>{p[k]=(p[k]||0)+weight;});
+  savePrefs(p);
+}
+// ===== EXPLORE COCKTAIL POOL =====
+const COCKTAIL_POOL=[
+  {name:'Piña Colada',user:'tropical_vibes',keys:['rum','coconut'],emoji:'🌴',bg:'#fb923c'},
+  {name:'Rum Punch',user:'caribbean_mix',keys:['rum'],emoji:'🥤',bg:'#fb923c'},
+  {name:'Dark & Stormy',user:'storm_bar',keys:['rum'],emoji:'⛈️',bg:'#b45309'},
+  {name:'Mai Tai',user:'aloha_drinks',keys:['rum'],emoji:'🌺',bg:'#f97316'},
+  {name:'Mojito',user:'havana_nights',keys:['rum'],emoji:'🌿',bg:'#10b981'},
+  {name:'Tom Collins',user:'gin_adventures',keys:['gin'],emoji:'🍸',bg:'#10b981'},
+  {name:'Gin & Tonic',user:'london_dry',keys:['gin'],emoji:'🌿',bg:'#34d399'},
+  {name:'Negroni',user:'cocktail_master',keys:['gin','campari','vermouth'],emoji:'🍊',bg:'#ef4444'},
+  {name:'Gimlet',user:'citrus_bar',keys:['gin'],emoji:'🍋',bg:'#a3e635'},
+  {name:'Vesper Martini',user:'bond_bar',keys:['gin','vodka'],emoji:'🍸',bg:'#60a5fa'},
+  {name:'Old Fashioned',user:'whiskey_tales',keys:['bourbon','whiskey'],emoji:'🥃',bg:'#f59e0b'},
+  {name:'Manhattan',user:'nyc_cocktails',keys:['whiskey','vermouth'],emoji:'🥃',bg:'#d97706'},
+  {name:'Whiskey Sour',user:'sour_power',keys:['whiskey'],emoji:'🍋',bg:'#fbbf24'},
+  {name:'Mint Julep',user:'southern_charm',keys:['bourbon'],emoji:'🌱',bg:'#34d399'},
+  {name:'Boulevardier',user:'paris_nights',keys:['bourbon','campari'],emoji:'🌆',bg:'#ef4444'},
+  {name:'Espresso Martini',user:'coffee_hour',keys:['vodka','coffee_liqueur'],emoji:'☕',bg:'#78350f'},
+  {name:'Vodka Tonic',user:'clean_drinks',keys:['vodka'],emoji:'🫙',bg:'#60a5fa'},
+  {name:'Moscow Mule',user:'copper_cup',keys:['vodka'],emoji:'🫙',bg:'#93c5fd'},
+  {name:'Cosmopolitan',user:'nyc_style',keys:['vodka'],emoji:'🌸',bg:'#ec4899'},
+  {name:'Margarita',user:'tequila_lover',keys:['tequila'],emoji:'🌵',bg:'#a3e635'},
+  {name:'Paloma',user:'mexico_mx',keys:['tequila'],emoji:'🍊',bg:'#fb923c'},
+  {name:'Tequila Sunrise',user:'sunrise_bar',keys:['tequila'],emoji:'🌅',bg:'#f59e0b'},
+  {name:'Mezcal Sour',user:'oaxaca_nights',keys:['mezcal'],emoji:'🌿',bg:'#86efac'},
+  {name:'Smoky Mezcal Negroni',user:'smoke_bar',keys:['mezcal','campari'],emoji:'💨',bg:'#6b7280'},
+  {name:'Aperol Spritz',user:'italian_vibes',keys:['wine'],emoji:'🍊',bg:'#f97316'},
+  {name:'Kir Royale',user:'champagne_life',keys:['wine'],emoji:'🍾',bg:'#9f1239'},
+  {name:'Mulled Wine',user:'winter_bar',keys:['wine'],emoji:'🍷',bg:'#9f1239'},
+  {name:'Brandy Alexander',user:'classic_cocktails',keys:['brandy'],emoji:'🍷',bg:'#b45309'},
+  {name:'Sidecar',user:'paris_classic',keys:['brandy'],emoji:'🍋',bg:'#d97706'},
+  {name:'White Russian',user:'big_lebowski',keys:['vodka','coffee_liqueur'],emoji:'🥛',bg:'#78350f'},
+  {name:'Amaretto Sour',user:'sweet_hour',keys:['liqueur'],emoji:'🍬',bg:'#e879f9'},
+  {name:'Campari Spritz',user:'aperitivo_bar',keys:['campari'],emoji:'🍊',bg:'#ef4444'},
+  {name:'Coconut Mojito',user:'beach_bar',keys:['rum','coconut'],emoji:'🥥',bg:'#fde68a'},
+  {name:'Vermouth Cassis',user:'bordeaux_bar',keys:['vermouth'],emoji:'🫗',bg:'#c084fc'},
+  {name:'Belgian Beer Cocktail',user:'brussels_bar',keys:['beer'],emoji:'🍺',bg:'#fbbf24'},
+  {name:'Shandy',user:'garden_party',keys:['beer'],emoji:'🌞',bg:'#fbbf24'},
+];
+
+function getSortedAlcoholTypes(){
+  const p=getPrefs();
+  return [...ALCOHOL_TYPES].sort((a,b)=>(p[b.key]||0)-(p[a.key]||0));
+}
+
+// Build personalized cocktail list: 75% preferred + 25% discovery
+function getPersonalizedPool(){
+  const p=getPrefs();
+  const topKeys=Object.entries(p).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);
+  if(!topKeys.length)return shuffle([...COCKTAIL_POOL]);
+  const preferred=COCKTAIL_POOL.filter(c=>c.keys.some(k=>topKeys.includes(k)));
+  const discovery=COCKTAIL_POOL.filter(c=>!c.keys.some(k=>topKeys.includes(k))).map(c=>({...c,_discover:true}));
+  const result=[];
+  let pi=0,di=0;
+  while(result.length<COCKTAIL_POOL.length&&(pi<preferred.length||di<discovery.length)){
+    for(let i=0;i<3&&pi<preferred.length;i++)result.push(preferred[pi++]);
+    if(di<discovery.length)result.push(discovery[di++]);
+  }
+  return result;
+}
+
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+
+const FEATURED_IDX=new Set([0,8,19,27]);
+
+function buildExploreGrid(){
+  const grid=document.getElementById('explore-grid');
+  if(!grid)return;
+  const pool=getPersonalizedPool();
+  grid.innerHTML='';
+  pool.forEach((c,idx)=>{
+    const a=ALCOHOL_TYPES.find(t=>t.key===c.keys[0])||ALCOHOL_TYPES[0];
+    const big=FEATURED_IDX.has(idx);
+    const cell=document.createElement('div');
+    cell.style.cssText=`grid-column:span ${big?2:1};grid-row:span ${big?2:1};aspect-ratio:1;position:relative;cursor:pointer;overflow:hidden;background:linear-gradient(135deg,${a.color}18,${a.color}40,#080810)`;
+    cell.onclick=()=>openStory(idx%4);
+    // Emoji
+    const emojiDiv=document.createElement('div');
+    emojiDiv.style.cssText=`position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:${big?44:26}px;filter:drop-shadow(0 0 ${big?24:12}px ${a.color}88)`;
+    emojiDiv.textContent=c.emoji;
+    cell.appendChild(emojiDiv);
+    // Gradient overlay
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.1) 55%,transparent 100%)';
+    cell.appendChild(overlay);
+    // Color dot
+    const dot=document.createElement('div');
+    dot.style.cssText=`position:absolute;top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:${a.color};box-shadow:0 0 6px ${a.color}`;
+    cell.appendChild(dot);
+    // Discovery badge
+    if(c._discover){
+      const badge=document.createElement('div');
+      badge.style.cssText='position:absolute;top:5px;right:5px;background:rgba(139,92,246,.85);border-radius:999px;font-size:8px;font-weight:700;color:#fff;padding:2px 5px';
+      badge.textContent=currentLang==='he'?'גלה':'New';
+      cell.appendChild(badge);
+    }
+    // Name
+    const nameDiv=document.createElement('div');
+    nameDiv.style.cssText=`position:absolute;bottom:0;left:0;right:0;padding:${big?'8px 8px 6px':'5px 5px 4px'}`;
+    nameDiv.innerHTML=`<div style="font-size:${big?11:8}px;font-weight:700;color:#fff;line-height:1.2;text-shadow:0 1px 4px rgba(0,0,0,.8);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${c.name}</div>${big?`<div style="font-size:8px;color:rgba(255,255,255,.5);margin-top:1px">@${c.user}</div>`:''}`;
+    cell.appendChild(nameDiv);
+    grid.appendChild(cell);
+  });
+}
+
+let exploreMode='grid'; // 'grid' | 'list'
+
+function buildExploreFilters(){
+  const wrap=document.getElementById('explore-filters');
+  if(!wrap)return;
+  const sorted=getSortedAlcoholTypes();
+  const prefs=getPrefs();
+  const topKey=Object.keys(prefs).length?sorted[0].key:null;
+  wrap.innerHTML='';
+  // ── All pill ──
+  const allBtn=document.createElement('div');
+  allBtn.id='explore-all-btn';
+  allBtn.className='filter-chip';
+  allBtn.style.cssText=exploreMode==='grid'?'background:rgba(139,92,246,.28);color:#a78bfa;border-color:rgba(139,92,246,.55)':'background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);border-color:rgba(255,255,255,.08)';
+  allBtn.textContent='🍸 '+(currentLang==='he'?'הכל':'All');
+  allBtn.onclick=function(){
+    exploreMode='grid';
+    document.getElementById('explore-grid').style.display='grid';
+    document.getElementById('explore-list').style.display='none';
+    document.getElementById('explore-search').value='';
+    buildExploreFilters();
+    buildExploreGrid();
+  };
+  wrap.appendChild(allBtn);
+  // ── Alcohol type pills ──
+  sorted.forEach((a,idx)=>{
+    const btn=document.createElement('div');
+    btn.className='filter-chip';
+    btn.dataset.key=a.key;
+    btn.dataset.color=a.color;
+    btn.style.cssText='background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);border-color:rgba(255,255,255,.08)';
+    const label=currentLang==='he'?a.labelHe:a.label;
+    btn.innerHTML=a.emoji+' '+label+(idx===0&&topKey?' 🔥':'');
+    btn.onclick=function(){
+      exploreMode='list';
+      document.getElementById('explore-grid').style.display='none';
+      document.getElementById('explore-list').style.display='block';
+      // reset all, activate this
+      wrap.querySelectorAll('.filter-chip').forEach(b=>{b.style.background='rgba(255,255,255,.05)';b.style.color='rgba(255,255,255,.45)';b.style.borderColor='rgba(255,255,255,.08)';});
+      const r=parseInt(a.color.slice(1,3),16),g=parseInt(a.color.slice(3,5),16),bv=parseInt(a.color.slice(5,7),16);
+      btn.style.background=`rgba(${r},${g},${bv},.22)`;
+      btn.style.color=a.color;
+      btn.style.borderColor=`rgba(${r},${g},${bv},.5)`;
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function onExploreSearch(val){
+  if(val.trim()){
+    exploreMode='list';
+    document.getElementById('explore-grid').style.display='none';
+    document.getElementById('explore-list').style.display='block';
+  }else{
+    exploreMode='grid';
+    document.getElementById('explore-grid').style.display='grid';
+    document.getElementById('explore-list').style.display='none';
+    buildExploreFilters();
+  }
+}
+
+function goTo(s){
+  document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const sc=document.getElementById('screen-'+s);
+  if(sc) sc.classList.add('active');
+  const nav=document.getElementById('nav-'+s);
+  if(nav) nav.classList.add('active');
+  if(s==='explore'){buildExploreFilters();if(exploreMode==='grid')buildExploreGrid();}
+}
+
+function openStory(i){
+  const s=stories[i]||stories[0];
+  currentStoryIdx=i;
+  // view no longer tracked — like on story = +1
+  document.getElementById('story-overlay').classList.add('open');
+  document.getElementById('story-bg').style.background=s.bg;
+  document.getElementById('story-avatar').textContent=s.avatar;
+  document.getElementById('story-avatar').style.background=s.gradient;
+  document.getElementById('story-username').textContent=s.username;
+  document.getElementById('story-time').textContent=s.time;
+  document.getElementById('story-emoji').textContent=s.emoji;
+  document.getElementById('story-title').textContent=s.title;
+  document.getElementById('story-tags').innerHTML=`<span class="alcohol-tag" style="background:${s.tagBg};color:${s.tagColor};border:1px solid ${s.tagBorder};font-size:11px">${s.tag}</span>`;
+  document.querySelector('#story-overlay .story-meta').innerHTML=`
+    <span style="color:${s.diffColor};display:flex;align-items:center;gap:4px">⚡${s.diff}</span>
+    <span style="color:rgba(255,255,255,.4)">⏱️ 4 min</span>
+    <span style="color:rgba(255,255,255,.3)">${s.views} views</span>
+  `;
+  storySaved=false;
+  document.getElementById('story-save-btn').style.background='linear-gradient(135deg,#8b5cf6,#ec4899)';
+  document.getElementById('story-save-btn').style.color='#fff';
+  document.getElementById('sv-save-text').textContent=t('saveToRecipeBook');
+  const fill=document.getElementById('prog-fill');
+  fill.style.animation='none';fill.offsetHeight;
+  fill.style.animation='prog 8s linear forwards';
+  recipeOpen=false;
+  document.getElementById('recipe-expand').style.maxHeight='0';
+  document.getElementById('recipe-chevron').style.transform='';
+}
+
+function closeStory(){
+  document.getElementById('story-overlay').classList.remove('open');
+  document.getElementById('rating-modal').style.display='none';
+}
+
+function toggleRecipe(){
+  recipeOpen=!recipeOpen;
+  document.getElementById('recipe-expand').style.maxHeight=recipeOpen?'500px':'0';
+  document.getElementById('recipe-chevron').style.transform=recipeOpen?'rotate(180deg)':'';
+}
+
+function storySave(){
+  if(storySaved){return;}
+  document.getElementById('rating-modal').style.display='block';
+}
+
+function confirmRating(el){
+  const r=el?el.textContent:null;
+  document.getElementById('rating-modal').style.display='none';
+  storySaved=true;
+  trackInteraction((stories[currentStoryIdx]||stories[0]).alcoholKeys,3); // save to recipe book = +3
+  const btn=document.getElementById('story-save-btn');
+  btn.style.background='rgba(139,92,246,.2)';
+  btn.style.border='1px solid rgba(139,92,246,.5)';
+  btn.style.color='#c4b5fd';
+  document.getElementById('sv-save-text').textContent=r?`${t('saved')} · ${r}/10`:t('saved');
+  btn.querySelector&&(btn.querySelector('#sv-save-text')||btn);
+}
+
+function saveRecipe(btn){
+  btn.style.background='rgba(139,92,246,.18)';
+  btn.style.color='#c4b5fd';
+  btn.style.borderColor='rgba(139,92,246,.4)';
+  btn.innerHTML='<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:currentColor;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Saved';
+  // track save: find alcohol keys from nearest tag in card
+  const card=btn.closest('.feed-card');
+  if(card){
+    const keys=[];
+    card.querySelectorAll('.alcohol-tag').forEach(tag=>{
+      const txt=tag.textContent.trim();
+      const found=ALCOHOL_TYPES.find(a=>txt.toLowerCase().includes(a.label.toLowerCase()));
+      if(found)keys.push(found.key);
+    });
+    if(keys.length)trackInteraction(keys,4); // save from feed = +4
+  }
+}
+function likeStory(){
+  // Like on story = +1
+  trackInteraction((stories[currentStoryIdx]||stories[0]).alcoholKeys,1);
+}
+function likePost(btn){
+  // Like on post = +0.33
+  const card=btn.closest('.feed-card');
+  if(card){
+    const keys=[];
+    card.querySelectorAll('.alcohol-tag').forEach(tag=>{
+      const txt=tag.textContent.trim();
+      const found=ALCOHOL_TYPES.find(a=>txt.toLowerCase().includes(a.label.toLowerCase()));
+      if(found)keys.push(found.key);
+    });
+    if(keys.length)trackInteraction(keys,0.33);
+  }
+  btn.style.color='#ec4899';
+}
+function unsaveRecipe(btn){
+  btn.style.background='rgba(255,255,255,.06)';
+  btn.style.color='#fff';
+  btn.style.borderColor='rgba(255,255,255,.1)';
+  btn.innerHTML='<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Save';
+}
+
+function openBar(){document.getElementById('bar-overlay').classList.add('open');}
+function closeBar(e){if(!e||e.target===document.getElementById('bar-overlay')||!e.target)document.getElementById('bar-overlay').classList.remove('open');}
+
+function toggleBar(el){
+  if(barRemoveMode){
+    el.remove();
+    updateBarCount();
+    return;
+  }
+  const color=el.dataset.color||'#8b5cf6';
+  const isSelected=el.dataset.selected==='1';
+  const baseText=el.dataset[currentLang]||el.dataset.en||el.textContent.replace(' ✓','').trim();
+  if(isSelected){
+    el.dataset.selected='0';
+    el.style.background='rgba(255,255,255,.05)';
+    el.style.borderColor='rgba(255,255,255,.09)';
+    el.style.color='rgba(255,255,255,.55)';
+    el.textContent=baseText;
+  }else{
+    el.dataset.selected='1';
+    const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+    el.style.background=`rgba(${r},${g},${b},.18)`;
+    el.style.borderColor=`rgba(${r},${g},${b},.45)`;
+    el.style.color=color;
+    el.textContent=baseText+' ✓';
+  }
+  updateBarCount();
+}
+
+function openUpload(){document.getElementById('upload-overlay').classList.add('open');}
+function closeUpload(e){if(!e||e.target===document.getElementById('upload-overlay')||!e)document.getElementById('upload-overlay').classList.remove('open');}
+
+function toggleExpand(header){
+  const card=header.closest('.recipe-book-card');
+  const expand=card.querySelector('.rb-expand');
+  if(expand){expand.classList.toggle('open');}
+}
+
+function selectTab(btn){
+  btn.closest('.tabs-row,.filter-scroll').querySelectorAll('.filter-chip,.tab-btn').forEach(b=>{
+    b.style.background='rgba(255,255,255,.04)';b.style.color='rgba(255,255,255,.4)';b.style.borderColor='rgba(255,255,255,.07)';
+  });
+  btn.style.background='rgba(139,92,246,.25)';btn.style.color='#a78bfa';btn.style.borderColor='rgba(139,92,246,.4)';
+}
+
+function toggleFilter(btn){
+  const active=btn.dataset.active==='1';
+  if(active){btn.style.background='rgba(255,255,255,.05)';btn.style.color='rgba(255,255,255,.45)';btn.style.borderColor='rgba(255,255,255,.08)';btn.dataset.active='0';}
+  else{btn.style.background='rgba(16,185,129,.2)';btn.style.color='#34d399';btn.style.borderColor='rgba(16,185,129,.4)';btn.dataset.active='1';}
+}
+
+// ===== MY BAR EXTRAS =====
+let barRemoveMode=false;
+let selectedBarColor='#8b5cf6';
+
+function updateBarCount(){
+  const count=document.querySelectorAll('#bar-grid .bar-item[data-selected="1"]').length;
+  document.getElementById('bar-count').textContent=count+' '+t('spirits');
+}
+
+function toggleRemoveMode(){
+  barRemoveMode=!barRemoveMode;
+  const btn=document.getElementById('bar-remove-btn');
+  const hint=document.getElementById('bar-hint');
+  const addBtn=document.getElementById('bar-add-btn');
+  const saveBtn=document.getElementById('bar-save-btn');
+  const addForm=document.getElementById('bar-add-form');
+  if(barRemoveMode){
+    btn.style.background='rgba(239,68,68,.15)';
+    btn.style.color='#f87171';
+    btn.style.borderColor='rgba(239,68,68,.3)';
+    hint.textContent=currentLang==='he'?'לחץ על משקה להסרתו מהרשימה שלך':'Tap a drink to remove it from your list';
+    hint.style.color='rgba(248,113,113,.7)';
+    addBtn.style.display='none';
+    addForm.style.display='none';
+    saveBtn.textContent=currentLang==='he'?'סיום הסרה':'Done Removing';
+    document.querySelectorAll('#bar-grid .bar-item').forEach(el=>{
+      const base=el.dataset[currentLang]||el.dataset.en;
+      el.style.background='rgba(239,68,68,.08)';
+      el.style.borderColor='rgba(239,68,68,.2)';
+      el.style.color='#f87171';
+      el.textContent=base+' ✕';
+    });
+  }else{
+    btn.style.background='rgba(255,255,255,.06)';
+    btn.style.color='rgba(255,255,255,.5)';
+    btn.style.borderColor='rgba(255,255,255,.1)';
+    hint.textContent=t('myBarHint');
+    hint.style.color='rgba(255,255,255,.35)';
+    addBtn.style.display='';
+    saveBtn.textContent=t('saveBar');
+    document.querySelectorAll('#bar-grid .bar-item').forEach(el=>{
+      const color=el.dataset.color||'#8b5cf6';
+      const isSelected=el.dataset.selected==='1';
+      const base=el.dataset[currentLang]||el.dataset.en;
+      if(isSelected){
+        const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+        el.style.background=`rgba(${r},${g},${b},.18)`;
+        el.style.borderColor=`rgba(${r},${g},${b},.45)`;
+        el.style.color=color;
+        el.textContent=base+' ✓';
+      }else{
+        el.style.background='rgba(255,255,255,.05)';
+        el.style.borderColor='rgba(255,255,255,.09)';
+        el.style.color='rgba(255,255,255,.55)';
+        el.textContent=base;
+      }
+    });
+  }
+}
+
+function toggleAddDrinkForm(){
+  const form=document.getElementById('bar-add-form');
+  const addBtn=document.getElementById('bar-add-btn');
+  const isShown=form.style.display!=='none'&&form.style.display!=='';
+  if(isShown){
+    form.style.display='none';
+    addBtn.style.background='rgba(255,255,255,.04)';
+    addBtn.style.borderColor='rgba(255,255,255,.2)';
+    addBtn.style.borderStyle='dashed';
+    addBtn.style.color='rgba(255,255,255,.4)';
+  }else{
+    form.style.display='block';
+    addBtn.style.background='rgba(139,92,246,.15)';
+    addBtn.style.borderColor='rgba(139,92,246,.35)';
+    addBtn.style.borderStyle='solid';
+    addBtn.style.color='#c4b5fd';
+    document.getElementById('bar-new-label').focus();
+  }
+}
+
+function selectBarColor(color,el){
+  selectedBarColor=color;
+  document.querySelectorAll('#bar-add-form [data-color]').forEach(s=>{s.style.border='2px solid transparent';});
+  el.style.border='2px solid white';
+}
+
+function addCustomDrink(){
+  const emoji=document.getElementById('bar-new-emoji').value.trim()||'🍸';
+  const label=document.getElementById('bar-new-label').value.trim();
+  if(!label)return;
+  const grid=document.getElementById('bar-grid');
+  const addBtn=document.getElementById('bar-add-btn');
+  const pill=document.createElement('div');
+  pill.className='bar-item';
+  pill.dataset.color=selectedBarColor;
+  const text=emoji+' '+label;
+  pill.dataset.en=text;
+  pill.dataset.he=text;
+  pill.dataset.selected='0';
+  pill.style.cssText='background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.09);color:rgba(255,255,255,.55)';
+  pill.textContent=text;
+  pill.onclick=function(){toggleBar(this);};
+  grid.insertBefore(pill,addBtn);
+  // Reset form
+  document.getElementById('bar-new-emoji').value='🍸';
+  document.getElementById('bar-new-label').value='';
+  selectedBarColor='#8b5cf6';
+  document.querySelectorAll('#bar-add-form [data-color]').forEach((s,i)=>{s.style.border=i===0?'2px solid white':'2px solid transparent';});
+  toggleAddDrinkForm();
+}
+
+function saveBar(){
+  if(barRemoveMode){toggleRemoveMode();return;}
+  const btn=document.getElementById('bar-save-btn');
+  const orig=btn.textContent;
+  btn.textContent='✓';
+  setTimeout(()=>{
+    document.getElementById('bar-overlay').classList.remove('open');
+    btn.textContent=orig;
+    updateBarCount();
+  },600);
+}
+
+// ===== PROFILE PICTURE =====
+function applyProfilePic(dataUrl){
+  const img=document.getElementById('profile-avatar-img');
+  const letter=document.getElementById('profile-avatar-letter');
+  const sImg=document.getElementById('my-story-avatar-img');
+  const sLetter=document.getElementById('my-story-avatar-letter');
+  if(dataUrl){
+    img.src=dataUrl; img.style.display='block'; letter.style.display='none';
+    sImg.src=dataUrl; sImg.style.display='block'; sLetter.style.display='none';
+  } else {
+    img.style.display='none'; letter.style.display='';
+    sImg.style.display='none'; sLetter.style.display='';
+  }
+}
+function handleProfilePic(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const dataUrl=e.target.result;
+    localStorage.setItem('profile_pic',dataUrl);
+    applyProfilePic(dataUrl);
+  };
+  reader.readAsDataURL(file);
+}
+// Load saved profile pic on startup
+(function(){
+  const saved=localStorage.getItem('profile_pic');
+  if(saved)applyProfilePic(saved);
+  buildExploreFilters();
+  buildExploreGrid();
+})();
+</script>
+</body>
+</html>
