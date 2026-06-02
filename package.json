@@ -6,8 +6,8 @@
     "node": ">=20.19"
   },
   "scripts": {
-    "build": "npm install --prefix frontend --legacy-peer-deps && npm run build --prefix frontend",
-    "start": "npm install --prefix backend --legacy-peer-deps && node backend/server.js",
+    "build": "npm install --prefix frontend --legacy-peer-deps --include=dev && npm run build --prefix frontend",
+    "start": "npm install --prefix backend --legacy-peer-deps --omit=dev && node backend/server.js",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev"
   }
