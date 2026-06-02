@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Bookmark, BookmarkCheck, ChevronDown, ChevronUp, Trash2, UtensilsCrossed, Clock, Zap } from 'lucide-react';
+import { X, Bookmark, BookmarkCheck, ChevronDown, ChevronUp, Trash2, UtensilsCrossed, Clock, Zap, Eye } from 'lucide-react';
 import Avatar from './Avatar';
 import { getAlcohol, getAlcoholLabel, timeAgo, difficultyColor, getImageUrl } from '../utils';
 import { useLang } from '../context/LangContext';
@@ -18,6 +18,10 @@ export default function StoryViewer({ group, initialIndex = 0, onClose, onStoryS
   const [deleting, setDeleting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Viewers list (owner-only)
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewers, setViewers] = useState([]);
+  const [viewersLoading, setViewersLoading] = useState(false);
 
   const stories = group.stories;
   const story = stories[storyIdx];
@@ -100,8 +104,7 @@ export default function StoryViewer({ group, initialIndex = 0, onClose, onStoryS
     : { background: `linear-gradient(160deg, #1a0a2e 0%, #2d1b4e 40%, #1e0f35 100%)` };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black"
-         style={{ maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
       <div className="w-full h-full flex flex-col" style={backgroundStyle}>
 
         {/* Overlay gradient */}
@@ -261,10 +264,23 @@ export default function StoryViewer({ group, initialIndex = 0, onClose, onStoryS
             </div>
           )}
 
-          {/* Owner stats row */}
+          {/* Owner stats row — views is clickable to open viewers list */}
           {isOwner && (
-            <div className="px-4 pb-6 flex gap-3 text-xs text-white/40">
-              <span>👁 {story.views_count || 0} {lang === 'he' ? 'צפיות' : 'views'}</span>
+            <div className="px-4 pb-6 flex gap-3 text-xs text-white/40 items-center">
+              <button
+                onClick={() => {
+                  setShowViewers(true);
+                  setPaused(true);
+                  setViewersLoading(true);
+                  api.get(`/stories/${story.id}/viewers`)
+                    .then(r => setViewers(r.data))
+                    .catch(() => setViewers([]))
+                    .finally(() => setViewersLoading(false));
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <Eye size={12} /> {story.views_count || 0} {lang === 'he' ? 'צפיות' : 'views'}
+              </button>
               <span>❤️ {story.likes_count || 0} {lang === 'he' ? 'לייקים' : 'likes'}</span>
               <span>🔖 {story.saves_count || 0} {lang === 'he' ? 'שמירות' : 'saves'}</span>
             </div>
@@ -333,6 +349,50 @@ export default function StoryViewer({ group, initialIndex = 0, onClose, onStoryS
               >
                 {deleting ? '...' : lang === 'he' ? 'מחק' : 'Delete'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewers list modal — owner only */}
+      {showViewers && (
+        <div className="absolute inset-0 z-20 flex items-end"
+             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+             onClick={() => { setShowViewers(false); setPaused(false); }}>
+          <div className="w-full rounded-t-3xl slide-up overflow-hidden"
+               style={{ background: '#111120', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}
+               onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-2">
+                <Eye size={18} className="text-purple-400" />
+                <h3 className="font-bold text-white">
+                  {lang === 'he' ? 'צפו בסטורי' : 'Viewers'}
+                  <span className="ml-2 text-white/40 font-normal text-sm">({viewers.length})</span>
+                </h3>
+              </div>
+              <button onClick={() => { setShowViewers(false); setPaused(false); }} className="text-white/50 hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {viewersLoading ? (
+                <div className="flex justify-center py-10"><div className="text-2xl animate-bounce">👁</div></div>
+              ) : viewers.length === 0 ? (
+                <div className="px-5 py-12 text-center text-white/40 text-sm">
+                  {lang === 'he' ? 'עוד אף אחד לא צפה בסטורי שלך' : 'No one has viewed your story yet'}
+                </div>
+              ) : (
+                viewers.map(v => (
+                  <div key={v.id} className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                    <Avatar user={v} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-white truncate">@{v.username}</div>
+                      {v.bio && <div className="text-xs text-white/40 truncate">{v.bio}</div>}
+                    </div>
+                    <span className="text-xs text-white/30 flex-shrink-0">{timeAgo(v.viewed_at, lang)}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

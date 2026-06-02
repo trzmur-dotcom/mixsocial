@@ -57,5 +57,10 @@ export const difficultyColor = { easy: '#10b981', medium: '#f59e0b', hard: '#ef4
 
 // Prepend API base URL to relative image paths.
 // Set VITE_API_URL env var in production; empty string = same origin.
+// Absolute URLs (http(s)://...) are returned unchanged so external image hosts work.
 export const API_BASE = import.meta.env.VITE_API_URL || '';
-export const getImageUrl = (url) => (url ? `${API_BASE}${url}` : null);
+export const getImageUrl = (url) => {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE}${url}`;
+};

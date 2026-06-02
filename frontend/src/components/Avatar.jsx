@@ -1,12 +1,10 @@
 import React from 'react';
-import { getAvatarGradient } from '../utils';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getAvatarGradient, getImageUrl } from '../utils';
 
 export default function Avatar({ user, size = 40, ring = false, ringViewed = false }) {
   const gradient = getAvatarGradient(user?.id || 1);
   const initials = (user?.username || '?')[0].toUpperCase();
-  const avatarUrl = user?.avatar ? `${API_BASE}${user.avatar}` : null;
+  const avatarUrl = getImageUrl(user?.avatar);
 
   const inner = (
     <div

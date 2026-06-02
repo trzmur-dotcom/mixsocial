@@ -1,0 +1,23 @@
+# Render Blueprint — point Render at this repo and it provisions the service.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: mixsocial
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/auth/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Turso credentials — set these manually in the Render dashboard
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      # ALLOWED_ORIGINS will be populated to the *.onrender.com URL after first deploy
+      - key: ALLOWED_ORIGINS
+        sync: false

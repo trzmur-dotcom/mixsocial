@@ -1,42 +1,48 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
 
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
+// Allow letters (including Hebrew/Unicode), numbers, underscore, and spaces. 3-30 chars.
+const USERNAME_RE = /^[\p{L}\p{N}_ ]{3,30}$/u;
 const EMAIL_RE    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Dummy hash used for timing-safe login — prevents user-enumeration via response time.
-// Without this, a missing user returns instantly while a wrong password runs bcrypt (~100ms).
 const DUMMY_HASH = bcrypt.hashSync('__timing_guard__', 10);
 
-// ── Health check (used by Railway) ──
+// ── Health check ──
 router.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
-  // Strict type checks — prevent crashes from non-string body fields
   if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string')
     return res.status(400).json({ error: 'All fields must be strings' });
   if (!username || !email || !password)
     return res.status(400).json({ error: 'All fields required' });
-  if (!USERNAME_RE.test(username))
-    return res.status(400).json({ error: 'Username must be 3–30 chars, letters/numbers/underscore only' });
+  if (!USERNAME_RE.test(username)) {
+    const trimmed = username.trim();
+    if (trimmed.length < 3 || trimmed.length > 30)
+      return res.status(400).json({ error: 'Username must be 3–30 characters' });
+    if (/[@.]/.test(trimmed))
+      return res.status(400).json({ error: 'Username cannot contain @ or dots — that looks like an email. Use letters/numbers only.' });
+    return res.status(400).json({ error: 'Username may only contain letters, numbers, spaces or underscore' });
+  }
   if (!EMAIL_RE.test(email) || email.length > 254)
     return res.status(400).json({ error: 'Invalid email address' });
   if (password.length < 8 || password.length > 128)
     return res.status(400).json({ error: 'Password must be 8–128 characters' });
 
   try {
-    const hash = bcrypt.hashSync(password, 12); // cost factor 12
-    const result = db.prepare(
+    const hash = bcrypt.hashSync(password, 12);
+    const result = await db.prepare(
       'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
     ).run(username.trim(), email.toLowerCase().trim(), hash);
-    const user = db.prepare(
+    const user = await db.prepare(
       'SELECT id, username, email, avatar, bio, followers_count, following_count FROM users WHERE id = ?'
     ).get(result.lastInsertRowid);
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { algorithm: 'HS256', expiresIn: '30d' });
@@ -48,10 +54,9 @@ router.post('/register', (req, res) => {
   }
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  // Strict type checks
   if (typeof email !== 'string' || typeof password !== 'string')
     return res.status(400).json({ error: 'Email and password must be strings' });
   if (!email || !password)
@@ -62,10 +67,8 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'Invalid password' });
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+    const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
 
-    // Always run bcrypt — prevents timing-based user enumeration.
-    // If user doesn't exist, compare against DUMMY_HASH (will always fail, same time cost).
     const hashToCheck = user ? user.password_hash : DUMMY_HASH;
     const valid = bcrypt.compareSync(password, hashToCheck);
 
@@ -77,6 +80,56 @@ router.post('/login', (req, res) => {
     res.json({ token, user: safe });
   } catch {
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// ── Password reset ──
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (typeof email !== 'string' || email.length > 254 || !EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: 'Invalid email address' });
+  }
+  try {
+    const user = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+    if (!user) return res.json({ ok: true });
+
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
+    await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+    await db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)')
+      .run(token, user.id, expiresAt);
+    await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at < ?').run(Date.now());
+
+    res.json({ ok: true, token, expiresInMinutes: 30 });
+  } catch {
+    res.status(500).json({ error: 'Request failed' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (typeof token !== 'string' || token.length < 32 || token.length > 128)
+    return res.status(400).json({ error: 'Invalid reset link' });
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128)
+    return res.status(400).json({ error: 'Password must be 8–128 characters' });
+  try {
+    const row = await db.prepare('SELECT user_id, expires_at FROM password_reset_tokens WHERE token = ?').get(token);
+    if (!row) return res.status(400).json({ error: 'Reset link is invalid or has been used' });
+    if (row.expires_at < Date.now()) {
+      await db.prepare('DELETE FROM password_reset_tokens WHERE token = ?').run(token);
+      return res.status(400).json({ error: 'Reset link has expired. Please request a new one.' });
+    }
+
+    const hash = bcrypt.hashSync(password, 12);
+    await db.transaction(async (tx) => {
+      await tx.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
+      await tx.prepare('DELETE FROM password_reset_tokens WHERE token = ?').run(token);
+    });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Request failed' });
   }
 });
 

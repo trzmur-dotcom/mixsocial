@@ -83,6 +83,10 @@ input:focus, textarea:focus { border-color: #8b5cf6; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .slide-up { animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
+/* Full-viewport panel for the upload-story modal — uses dvh on modern mobile browsers
+   so it accounts for the dynamic URL bar, falling back to vh elsewhere. */
+.upload-story-panel { height: 100vh; height: 100dvh; }
+
 @keyframes pulse-ring {
   0% { transform: scale(1); opacity: 1; }
   100% { transform: scale(1.15); opacity: 0; }

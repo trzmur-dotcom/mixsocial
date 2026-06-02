@@ -95,14 +95,13 @@ export default function UploadStory({ onClose, onUploaded }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end"
-         style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
-                  maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }}>
-      <div className="w-full rounded-t-3xl slide-up overflow-hidden"
-           style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '92vh' }}>
+    <div className="fixed inset-0 z-[100] flex"
+         style={{ background: '#0e0e1a' }}>
+      <div className="w-full h-full slide-up overflow-hidden flex flex-col"
+           style={{ background: '#0e0e1a' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <button onClick={onClose} className="text-white/50 hover:text-white"><X size={22} /></button>
           <h2 className="font-bold text-white">{t('newStory')}</h2>
           <div className="flex gap-1">
@@ -113,7 +112,7 @@ export default function UploadStory({ onClose, onUploaded }) {
           </div>
         </div>
 
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 70px)' }}>
+        <div className="overflow-y-auto flex-1">
 
           {/* Step 1: Basic info */}
           {step === 1 && (

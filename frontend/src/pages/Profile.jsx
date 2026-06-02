@@ -70,8 +70,8 @@ export default function Profile() {
   const handleSaveBio = async () => {
     setUsernameError('');
     const trimmedUsername = usernameText.trim();
-    if (!/^[a-zA-Z0-9_]{3,30}$/.test(trimmedUsername)) {
-      setUsernameError(lang === 'he' ? 'שם משתמש: 3-30 תווים, אותיות/מספרים/קו תחתון בלבד' : 'Username: 3–30 chars, letters/numbers/underscore only');
+    if (!/^[\p{L}\p{N}_ ]{3,30}$/u.test(trimmedUsername)) {
+      setUsernameError(lang === 'he' ? 'שם משתמש: 3-30 תווים' : 'Username: 3–30 characters');
       return;
     }
     try {

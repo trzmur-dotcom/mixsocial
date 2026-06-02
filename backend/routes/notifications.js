@@ -4,14 +4,13 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get notifications (newest first, paginated)
-router.get('/', auth, (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = 30;
     const offset = (page - 1) * limit;
 
-    const notifications = db.prepare(`
+    const notifications = await db.prepare(`
       SELECT n.id, n.type, n.story_id, n.story_name, n.read, n.created_at,
              u.id as actor_id, u.username as actor_username, u.avatar as actor_avatar
       FROM notifications n
@@ -28,10 +27,9 @@ router.get('/', auth, (req, res) => {
   }
 });
 
-// Unread count (for bell badge)
-router.get('/unread-count', auth, (req, res) => {
+router.get('/unread-count', auth, async (req, res) => {
   try {
-    const row = db.prepare(
+    const row = await db.prepare(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0'
     ).get(req.userId);
     res.json({ count: row.count });
@@ -41,12 +39,10 @@ router.get('/unread-count', auth, (req, res) => {
   }
 });
 
-// Mark all as read
-router.put('/read', auth, (req, res) => {
+router.put('/read', auth, async (req, res) => {
   try {
-    db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.userId);
-    // Prune: keep only the latest 200 notifications per user to prevent unbounded growth
-    db.prepare(`
+    await db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.userId);
+    await db.prepare(`
       DELETE FROM notifications
       WHERE user_id = ? AND id NOT IN (
         SELECT id FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 200

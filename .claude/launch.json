@@ -1,11 +1,17 @@
-﻿{
+{
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "cocktail-preview",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-s", ".", "--listen", "3333", "--no-clipboard"],
-      "port": 3333
+      "name": "backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["backend/server.js"],
+      "port": 3001
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
+      "port": 5173
     }
   ]
 }

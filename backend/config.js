@@ -1,17 +1,10 @@
 const path = require('path');
-const fs   = require('fs');
 
-// DATA_DIR: where the SQLite DB and uploaded images live.
-//   Production (Railway) → mount a Volume at /data and set DATA_DIR=/data
-//   Development          → defaults to the backend folder itself
+// Local fallback path for SQLite — only used if TURSO_DATABASE_URL is not set.
+// In production we use Turso (cloud SQLite) and this file is never created.
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(__dirname);
+const DB_PATH = path.join(DATA_DIR, 'cocktail.db');
 
-const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
-const DB_PATH     = path.join(DATA_DIR, 'cocktail.db');
-
-// Guarantee the uploads directory exists before anything tries to write there
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-module.exports = { DATA_DIR, UPLOADS_DIR, DB_PATH };
+module.exports = { DATA_DIR, DB_PATH };
