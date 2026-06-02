@@ -101,6 +101,7 @@ async function bootstrap() {
       followers_count INTEGER DEFAULT 0,
       following_count INTEGER DEFAULT 0,
       is_demo INTEGER DEFAULT 0,
+      password_changed_at INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS stories (

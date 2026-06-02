@@ -20,6 +20,14 @@ async function removeSelfViews() {
   }
 }
 
+async function addPasswordChangedAtColumn() {
+  const cols = await db.prepare("PRAGMA table_info(users)").all();
+  if (!cols.some(c => c.name === 'password_changed_at')) {
+    await db.prepare("ALTER TABLE users ADD COLUMN password_changed_at INTEGER DEFAULT 0").run();
+    console.log('🧹 Migration: added password_changed_at column');
+  }
+}
+
 async function extendExistingStoryLifetime() {
   const result = await db.prepare(`
     UPDATE stories
@@ -33,8 +41,9 @@ async function extendExistingStoryLifetime() {
 }
 
 async function runAll() {
-  try { await removeSelfViews();             } catch (err) { console.error('Migration removeSelfViews:',           err.message); }
-  try { await extendExistingStoryLifetime(); } catch (err) { console.error('Migration extendExistingStoryLifetime:', err.message); }
+  try { await removeSelfViews();              } catch (err) { console.error('Migration removeSelfViews:',              err.message); }
+  try { await extendExistingStoryLifetime();  } catch (err) { console.error('Migration extendExistingStoryLifetime:',  err.message); }
+  try { await addPasswordChangedAtColumn();   } catch (err) { console.error('Migration addPasswordChangedAtColumn:',   err.message); }
 }
 
 module.exports = runAll;

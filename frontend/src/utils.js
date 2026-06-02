@@ -57,10 +57,15 @@ export const difficultyColor = { easy: '#10b981', medium: '#f59e0b', hard: '#ef4
 
 // Prepend API base URL to relative image paths.
 // Set VITE_API_URL env var in production; empty string = same origin.
-// Absolute URLs (http(s)://...) are returned unchanged so external image hosts work.
+// Returns absolute URLs (http(s)://) and data:image/ URIs unchanged.
+// SECURITY: only allows http/https and data:image/ — anything else (javascript:,
+// vbscript:, file://) returns null so it can never end up as an <img src>.
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 export const getImageUrl = (url) => {
-  if (!url) return null;
+  if (!url || typeof url !== 'string') return null;
   if (/^https?:\/\//i.test(url)) return url;
-  return `${API_BASE}${url}`;
+  if (/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(url)) return url;
+  // Relative paths must start with a single slash (no protocol)
+  if (url.startsWith('/') && !url.startsWith('//')) return `${API_BASE}${url}`;
+  return null;
 };

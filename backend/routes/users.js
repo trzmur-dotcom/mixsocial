@@ -12,7 +12,7 @@ const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 // Memory storage — avatars saved as data: URIs in users.avatar (Render free has no persistent disk)
 const uploadAvatar = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  limits: { fileSize: 800 * 1024 }, // 800 KB — avatars appear in many list responses
   fileFilter: (req, file, cb) => {
     if (ALLOWED_MIME.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPEG, PNG or WebP images are allowed'));
@@ -95,10 +95,13 @@ router.get('/me/recipes', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Request failed' }); }
 });
 
-// ── Get another user's public recipes ──
+// ── Get another user's recipes ──
+// SECURITY: a user's saved recipes are private. Only the owner can view them.
+// (Personal ratings could reveal taste / health information.)
 router.get('/:id/recipes', auth, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
+  if (targetId !== req.userId) return res.status(403).json({ error: 'Not authorized' });
   try {
     const recipes = await db.prepare(`
       SELECT s.*, u.username, u.avatar, sr.rating, sr.saved_at

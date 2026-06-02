@@ -14,7 +14,7 @@ const VALID_DIFFICULTY = ['easy', 'medium', 'hard'];
 // so images are stored as data: URIs in the stories table.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB (base64 inflates ~33%)
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB raw → ~2.7 MB base64 in DB
   fileFilter: (req, file, cb) => {
     if (ALLOWED_MIME.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPEG, PNG, WebP and GIF images are allowed'));

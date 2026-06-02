@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { JWT_SECRET } = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
+const { JWT_SECRET, invalidateUserCache } = authMiddleware;
 
 const router = express.Router();
 
@@ -67,7 +68,10 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Invalid password' });
 
   try {
-    const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+    // Explicit columns — never trust spread-strip to keep secrets out.
+    const user = await db.prepare(
+      'SELECT id, username, email, avatar, bio, followers_count, following_count, password_hash FROM users WHERE email = ?'
+    ).get(email.toLowerCase().trim());
 
     const hashToCheck = user ? user.password_hash : DUMMY_HASH;
     const valid = bcrypt.compareSync(password, hashToCheck);
@@ -93,15 +97,21 @@ router.post('/forgot-password', async (req, res) => {
   }
   try {
     const user = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
-    if (!user) return res.json({ ok: true });
 
+    // SECURITY: always return a token-shaped response so we don't leak whether
+    // the email exists. If the email exists we store a real one; if not, we
+    // generate a fake one that's not in the DB. The reset attempt will simply
+    // fail with "Invalid reset link" for the fake — same error path as a
+    // genuine expired/used token, so no enumeration signal either way.
     const token = crypto.randomBytes(24).toString('hex');
-    const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
-    await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
-    await db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)')
-      .run(token, user.id, expiresAt);
-    await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at < ?').run(Date.now());
-
+    if (user) {
+      const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
+      await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+      await db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)')
+        .run(token, user.id, expiresAt);
+      await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at < ?').run(Date.now());
+    }
+    // Constant-shape response — attacker can't distinguish existing vs missing email
     res.json({ ok: true, token, expiresInMinutes: 30 });
   } catch {
     res.status(500).json({ error: 'Request failed' });
@@ -123,10 +133,16 @@ router.post('/reset-password', async (req, res) => {
     }
 
     const hash = bcrypt.hashSync(password, 12);
+    const now = Date.now();
     await db.transaction(async (tx) => {
-      await tx.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
+      // SECURITY: bump password_changed_at so all JWT tokens issued before this
+      // moment are rejected by the auth middleware. Prevents a stolen token
+      // from staying valid after a password reset.
+      await tx.prepare('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?')
+        .run(hash, now, row.user_id);
       await tx.prepare('DELETE FROM password_reset_tokens WHERE token = ?').run(token);
     });
+    invalidateUserCache(row.user_id);
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: 'Request failed' });

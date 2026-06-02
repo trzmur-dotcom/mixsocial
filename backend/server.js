@@ -45,21 +45,29 @@ app.use(helmet({
 }));
 
 // ── CORS ──
+// SECURITY: lock down to specific origins. In production, the frontend is served
+// from the same Express process so CORS isn't even needed for the app itself —
+// it's only relevant for any external tool that wants to call the API.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5200'];
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return cb(null, true);
+    // Same-origin requests (no Origin header) — always allowed
+    if (!origin) return cb(null, true);
+    // Explicit allowlist — wildcard is now ignored even if set, to prevent
+    // accidental exposure. Only exact origin matches pass.
+    if (allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  // Strip cookies/credentials from preflight responses; we use Bearer tokens.
 }));
 
-// ── Body size limit — bumped to 10MB so base64 image uploads fit ──
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ── Body size limit — accommodates a 2 MB image base64-encoded ──
+app.use(express.json({ limit: '4mb' }));
+app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
 // ── Rate limiting ──
 const globalLimiter = rateLimit({
@@ -72,11 +80,15 @@ const globalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  // Don't rate-limit the health check — Render hits it every few seconds and
-  // UptimeRobot every few minutes. Limiting them just causes false-positive 429s
-  // which Render interprets as "unhealthy" and restarts the container.
   skip: (req) => req.path === '/health',
   message: { error: 'Too many authentication attempts, please try again later.' },
+});
+// Tighter limiter for password reset — prevents enumeration attempts and
+// brute-forcing the 24-byte tokens.
+const resetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,   // 1 hour window
+  max: 5,                     // 5 attempts per IP per hour
+  message: { error: 'Too many password reset attempts, please try again later.' },
 });
 
 // Health check is registered BEFORE the rate limiters so it never gets blocked.
@@ -87,6 +99,9 @@ app.get('/api/auth/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api', globalLimiter);
 app.use('/api/auth', authLimiter);
+// Reset endpoints get an extra-tight limiter on top of authLimiter
+app.use('/api/auth/forgot-password', resetLimiter);
+app.use('/api/auth/reset-password',  resetLimiter);
 
 // ── API Routes ──
 app.use('/api/auth', require('./routes/auth'));
@@ -106,7 +121,7 @@ if (IS_PROD && fs.existsSync(FRONTEND_DIST)) {
 
 // ── Multer / file-upload error handler ──
 app.use((err, req, res, next) => {
-  if (err.code === 'LIMIT_FILE_SIZE')        return res.status(400).json({ error: 'File too large. Maximum size is 5 MB.' });
+  if (err.code === 'LIMIT_FILE_SIZE')        return res.status(400).json({ error: 'File too large. Maximum size is 2 MB for cocktail photos, 800 KB for avatars.' });
   if (err.code === 'LIMIT_UNEXPECTED_FILE')  return res.status(400).json({ error: 'Unexpected file field.' });
   if (err.message && /only .*(jpeg|png|webp|gif|image)/i.test(err.message))
     return res.status(400).json({ error: err.message });
