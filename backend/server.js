@@ -15,6 +15,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// Render (and most PaaS hosts) put us behind a reverse proxy.
+// `trust proxy` lets express-rate-limit see the real client IP via X-Forwarded-For,
+// otherwise every request looks like it's from the proxy → instant 429s.
+if (IS_PROD) app.set('trust proxy', 1);
+
 // ── Security headers ──
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -67,8 +72,18 @@ const globalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  // Don't rate-limit the health check — Render hits it every few seconds and
+  // UptimeRobot every few minutes. Limiting them just causes false-positive 429s
+  // which Render interprets as "unhealthy" and restarts the container.
+  skip: (req) => req.path === '/health',
   message: { error: 'Too many authentication attempts, please try again later.' },
 });
+
+// Health check is registered BEFORE the rate limiters so it never gets blocked.
+// Render polls this every few seconds; if it ever returns 429, Render assumes
+// the container is unhealthy and restarts it.
+app.get('/api/health',      (req, res) => res.json({ status: 'ok' }));
+app.get('/api/auth/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api', globalLimiter);
 app.use('/api/auth', authLimiter);
