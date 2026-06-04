@@ -65,9 +65,9 @@ app.use(cors({
   // Strip cookies/credentials from preflight responses; we use Bearer tokens.
 }));
 
-// ── Body size limit — accommodates a 2 MB image base64-encoded ──
-app.use(express.json({ limit: '4mb' }));
-app.use(express.urlencoded({ extended: true, limit: '4mb' }));
+// ── Body size limit — accommodates a 5 MB image base64-encoded (~6.85 MB) ──
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 
 // ── Rate limiting ──
 const globalLimiter = rateLimit({
@@ -121,7 +121,7 @@ if (IS_PROD && fs.existsSync(FRONTEND_DIST)) {
 
 // ── Multer / file-upload error handler ──
 app.use((err, req, res, next) => {
-  if (err.code === 'LIMIT_FILE_SIZE')        return res.status(400).json({ error: 'File too large. Maximum size is 2 MB for cocktail photos, 800 KB for avatars.' });
+  if (err.code === 'LIMIT_FILE_SIZE')        return res.status(400).json({ error: 'File too large. Maximum size is 5 MB for cocktail photos, 800 KB for avatars.' });
   if (err.code === 'LIMIT_UNEXPECTED_FILE')  return res.status(400).json({ error: 'Unexpected file field.' });
   if (err.message && /only .*(jpeg|png|webp|gif|image)/i.test(err.message))
     return res.status(400).json({ error: err.message });
