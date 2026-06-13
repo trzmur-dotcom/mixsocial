@@ -96,12 +96,16 @@ router.get('/me/recipes', auth, async (req, res) => {
 });
 
 // ── Get another user's recipes ──
-// SECURITY: a user's saved recipes are private. Only the owner can view them.
-// (Personal ratings could reveal taste / health information.)
+// Visible to: the owner, OR anyone whose follow request the owner has accepted.
 router.get('/:id/recipes', auth, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
-  if (targetId !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+  if (targetId !== req.userId) {
+    const followRow = await db.prepare(
+      "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'accepted'"
+    ).get(req.userId, targetId);
+    if (!followRow) return res.status(403).json({ error: 'Follow this user to see their recipe book' });
+  }
   try {
     const recipes = await db.prepare(`
       SELECT s.*, u.username, u.avatar, sr.rating, sr.saved_at
@@ -144,8 +148,9 @@ router.get('/search', auth, async (req, res) => {
   const escaped = clean.replace(/[%_\\]/g, '\\$&');
   try {
     const users = await db.prepare(`
-      SELECT id, username, avatar, bio, followers_count, following_count,
-        CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_following
+      SELECT u.id, u.username, u.avatar, u.bio, u.followers_count, u.following_count,
+        CASE WHEN f.status = 'accepted' THEN 1 ELSE 0 END as is_following,
+        CASE WHEN f.status = 'pending'  THEN 1 ELSE 0 END as follow_pending
       FROM users u
       LEFT JOIN follows f ON f.follower_id = ? AND f.following_id = u.id
       WHERE u.username LIKE ? ESCAPE '\\' AND u.id != ?
@@ -165,45 +170,146 @@ router.get('/:id', auth, async (req, res) => {
       'SELECT id, username, avatar, bio, followers_count, following_count, created_at FROM users WHERE id = ?'
     ).get(targetId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const isFollowing = !!(await db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.userId, targetId));
+    const followRow = await db.prepare('SELECT status FROM follows WHERE follower_id = ? AND following_id = ?')
+      .get(req.userId, targetId);
+    const followStatus = followRow ? followRow.status : 'none'; // 'none' | 'pending' | 'accepted'
     const storiesCountRow = await db.prepare('SELECT COUNT(*) as c FROM stories WHERE user_id = ?').get(targetId);
-    res.json({ ...user, is_following: isFollowing, stories_count: storiesCountRow.c });
+    res.json({
+      ...user,
+      stories_count: storiesCountRow.c,
+      follow_status: followStatus,
+      is_following: followStatus === 'accepted',  // backwards compat
+      follow_pending: followStatus === 'pending',
+    });
   } catch { res.status(500).json({ error: 'Request failed' }); }
 });
 
 // ── Follow ──
+// Follow flow (Instagram-style approval):
+//   1. Requester POSTs /:id/follow                  → row inserted with status='pending'
+//                                                      (or auto-accepted for demo users)
+//   2. Target gets notification 'follow_request'
+//   3. Target POSTs /:id/follow/accept              → status flips to 'accepted', counts bump
+//   4. Requester gets notification 'follow_accepted'
+//   5. DELETE /:id/follow works at any stage (cancel pending OR unfollow accepted)
+//   6. Target POSTs /:id/follow/reject              → deletes the pending row
+//
+// Counts only reflect 'accepted' relationships.
 router.post('/:id/follow', auth, userRateLimit('follow', 30, 60 * 60 * 1000, 'Too many follow actions. Please slow down.'), async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
   if (targetId === req.userId) return res.status(400).json({ error: 'Cannot follow yourself' });
   try {
+    let resultStatus = 'pending';
     await db.transaction(async (tx) => {
-      const existing = await tx.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.userId, targetId);
-      if (!existing) {
-        await tx.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(req.userId, targetId);
+      const existing = await tx.prepare('SELECT status FROM follows WHERE follower_id = ? AND following_id = ?').get(req.userId, targetId);
+      if (existing) { resultStatus = existing.status; return; } // idempotent
+
+      // Demo users never log in to approve, so auto-accept follows targeting them.
+      const target = await tx.prepare('SELECT COALESCE(is_demo, 0) as is_demo FROM users WHERE id = ?').get(targetId);
+      if (!target) { const e = new Error('User not found'); e.status = 404; throw e; }
+      const initialStatus = target.is_demo ? 'accepted' : 'pending';
+
+      await tx.prepare('INSERT INTO follows (follower_id, following_id, status) VALUES (?, ?, ?)')
+        .run(req.userId, targetId, initialStatus);
+
+      if (initialStatus === 'accepted') {
         await tx.prepare('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?').run(targetId);
         await tx.prepare('UPDATE users SET following_count = following_count + 1 WHERE id = ?').run(req.userId);
-        try {
-          await tx.prepare('INSERT OR IGNORE INTO notifications (user_id, actor_id, type) VALUES (?, ?, ?)')
-            .run(targetId, req.userId, 'follow');
-        } catch {}
       }
+      try {
+        await tx.prepare('INSERT OR IGNORE INTO notifications (user_id, actor_id, type) VALUES (?, ?, ?)')
+          .run(targetId, req.userId, initialStatus === 'accepted' ? 'follow' : 'follow_request');
+      } catch {}
+      resultStatus = initialStatus;
+    });
+    res.json({ success: true, status: resultStatus });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status === 404 ? 'User not found' : 'Request failed' });
+  }
+});
+
+// ── Accept incoming follow request ──
+// targetId in the URL is the user who SENT the request (now becoming my follower).
+router.post('/:id/follow/accept', auth, async (req, res) => {
+  const followerId = parseInt(req.params.id);
+  if (!Number.isInteger(followerId) || followerId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
+  try {
+    let updated = false;
+    await db.transaction(async (tx) => {
+      const row = await tx.prepare("SELECT status FROM follows WHERE follower_id = ? AND following_id = ?")
+        .get(followerId, req.userId);
+      if (!row) { const e = new Error('No pending request'); e.status = 404; throw e; }
+      if (row.status === 'accepted') return; // already accepted, idempotent
+
+      await tx.prepare("UPDATE follows SET status = 'accepted' WHERE follower_id = ? AND following_id = ?")
+        .run(followerId, req.userId);
+      await tx.prepare('UPDATE users SET followers_count = followers_count + 1 WHERE id = ?').run(req.userId);
+      await tx.prepare('UPDATE users SET following_count = following_count + 1 WHERE id = ?').run(followerId);
+      try {
+        await tx.prepare('INSERT OR IGNORE INTO notifications (user_id, actor_id, type) VALUES (?, ?, ?)')
+          .run(followerId, req.userId, 'follow_accepted');
+        // The original 'follow_request' notification is now actionable-handled,
+        // remove it so the recipient's notifications list doesn't get cluttered.
+        await tx.prepare("DELETE FROM notifications WHERE user_id = ? AND actor_id = ? AND type = 'follow_request'")
+          .run(req.userId, followerId);
+      } catch {}
+      updated = true;
+    });
+    res.json({ success: true, accepted: updated });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status === 404 ? 'No pending request' : 'Request failed' });
+  }
+});
+
+// ── Reject incoming follow request ──
+router.post('/:id/follow/reject', auth, async (req, res) => {
+  const followerId = parseInt(req.params.id);
+  if (!Number.isInteger(followerId) || followerId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
+  try {
+    await db.transaction(async (tx) => {
+      await tx.prepare("DELETE FROM follows WHERE follower_id = ? AND following_id = ? AND status = 'pending'")
+        .run(followerId, req.userId);
+      await tx.prepare("DELETE FROM notifications WHERE user_id = ? AND actor_id = ? AND type = 'follow_request'")
+        .run(req.userId, followerId);
     });
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Request failed' }); }
 });
 
-// ── Unfollow ──
+// ── List pending requests targeting me ──
+router.get('/me/follow-requests', auth, async (req, res) => {
+  try {
+    const rows = await db.prepare(`
+      SELECT u.id, u.username, u.avatar, u.bio, f.created_at
+      FROM follows f
+      JOIN users u ON f.follower_id = u.id
+      WHERE f.following_id = ? AND f.status = 'pending'
+      ORDER BY f.created_at DESC
+      LIMIT 100
+    `).all(req.userId);
+    res.json(rows);
+  } catch { res.status(500).json({ error: 'Request failed' }); }
+});
+
+// ── Unfollow (cancel pending OR remove accepted) ──
 router.delete('/:id/follow', auth, async (req, res) => {
   const targetId = parseInt(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'Invalid user ID' });
   try {
     await db.transaction(async (tx) => {
-      const result = await tx.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.userId, targetId);
-      if (result.changes > 0) {
+      const row = await tx.prepare('SELECT status FROM follows WHERE follower_id = ? AND following_id = ?').get(req.userId, targetId);
+      if (!row) return;
+      await tx.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.userId, targetId);
+      if (row.status === 'accepted') {
         await tx.prepare('UPDATE users SET followers_count = MAX(0, followers_count - 1) WHERE id = ?').run(targetId);
         await tx.prepare('UPDATE users SET following_count = MAX(0, following_count - 1) WHERE id = ?').run(req.userId);
       }
+      // Clean up any stale notifications relating to this relationship.
+      await tx.prepare("DELETE FROM notifications WHERE user_id = ? AND actor_id = ? AND type IN ('follow','follow_request','follow_accepted')")
+        .run(targetId, req.userId);
+      await tx.prepare("DELETE FROM notifications WHERE user_id = ? AND actor_id = ? AND type IN ('follow','follow_request','follow_accepted')")
+        .run(req.userId, targetId);
     });
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Request failed' }); }

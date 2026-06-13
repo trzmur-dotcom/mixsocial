@@ -20,6 +20,17 @@ async function removeSelfViews() {
   }
 }
 
+async function addFollowStatusColumn() {
+  const cols = await db.prepare("PRAGMA table_info(follows)").all();
+  if (!cols.some(c => c.name === 'status')) {
+    await db.prepare("ALTER TABLE follows ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'").run();
+    // Existing relationships are grandfathered to 'accepted' so users
+    // don't suddenly lose followers when the feature ships.
+    const r = await db.prepare("UPDATE follows SET status = 'accepted'").run();
+    console.log(`🧹 Migration: added status column to follows; grandfathered ${r.changes} existing follows as accepted`);
+  }
+}
+
 async function addPasswordChangedAtColumn() {
   const cols = await db.prepare("PRAGMA table_info(users)").all();
   if (!cols.some(c => c.name === 'password_changed_at')) {
@@ -44,6 +55,7 @@ async function runAll() {
   try { await removeSelfViews();              } catch (err) { console.error('Migration removeSelfViews:',              err.message); }
   try { await extendExistingStoryLifetime();  } catch (err) { console.error('Migration extendExistingStoryLifetime:',  err.message); }
   try { await addPasswordChangedAtColumn();   } catch (err) { console.error('Migration addPasswordChangedAtColumn:',   err.message); }
+  try { await addFollowStatusColumn();        } catch (err) { console.error('Migration addFollowStatusColumn:',        err.message); }
 }
 
 module.exports = runAll;

@@ -48,12 +48,25 @@ export default function Profile() {
   useEffect(() => { loadData(); }, [id]);
 
   const handleFollow = async () => {
-    if (profile.is_following) {
+    const status = profile.follow_status || (profile.is_following ? 'accepted' : 'none');
+    if (status === 'accepted') {
       await api.delete(`/users/${id}/follow`);
-      setProfile(p => ({ ...p, is_following: false, followers_count: p.followers_count - 1 }));
+      setProfile(p => ({ ...p, follow_status: 'none', is_following: false, follow_pending: false,
+                         followers_count: Math.max(0, (p.followers_count || 0) - 1) }));
+    } else if (status === 'pending') {
+      // Cancel pending request
+      await api.delete(`/users/${id}/follow`);
+      setProfile(p => ({ ...p, follow_status: 'none', is_following: false, follow_pending: false }));
     } else {
-      await api.post(`/users/${id}/follow`);
-      setProfile(p => ({ ...p, is_following: true, followers_count: p.followers_count + 1 }));
+      const { data } = await api.post(`/users/${id}/follow`);
+      const newStatus = data.status || 'pending';
+      setProfile(p => ({
+        ...p,
+        follow_status: newStatus,
+        is_following: newStatus === 'accepted',
+        follow_pending: newStatus === 'pending',
+        followers_count: newStatus === 'accepted' ? (p.followers_count || 0) + 1 : p.followers_count,
+      }));
     }
   };
 
@@ -206,18 +219,27 @@ export default function Profile() {
           >
             <Wine size={16} /> {t('manageMyBar')}
           </button>
-        ) : (
-          <button
-            onClick={handleFollow}
-            className={profile?.is_following ? 'w-full py-2.5 rounded-2xl font-semibold text-sm' : 'btn-primary w-full py-2.5'}
-            style={profile?.is_following
-              ? { borderRadius: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }
-              : { borderRadius: '14px' }
-            }
-          >
-            {profile?.is_following ? t('following_btn') : t('follow')}
-          </button>
-        )}
+        ) : (() => {
+          const status = profile?.follow_status || (profile?.is_following ? 'accepted' : profile?.follow_pending ? 'pending' : 'none');
+          const label = status === 'accepted' ? t('following_btn')
+                      : status === 'pending'  ? (lang === 'he' ? 'בקשה ממתינה' : 'Requested')
+                      : t('follow');
+          const styleForStatus = status === 'none'
+            ? { borderRadius: '14px' }
+            : { borderRadius: '14px',
+                background: status === 'pending' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.08)',
+                color: status === 'pending' ? '#fbbf24' : 'white',
+                border: `1px solid ${status === 'pending' ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.15)'}` };
+          return (
+            <button
+              onClick={handleFollow}
+              className={status === 'none' ? 'btn-primary w-full py-2.5' : 'w-full py-2.5 rounded-2xl font-semibold text-sm'}
+              style={styleForStatus}
+            >
+              {label}
+            </button>
+          );
+        })()}
       </div>
 
       {/* Recipe Book */}

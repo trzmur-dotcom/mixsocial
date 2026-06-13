@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { X, Heart, Bookmark, Users, UserPlus } from 'lucide-react';
+import { X, Heart, Bookmark, Users, UserPlus, UserCheck } from 'lucide-react';
 import Avatar from './Avatar';
 import { timeAgo } from '../utils';
 import { useLang } from '../context/LangContext';
@@ -26,6 +26,16 @@ const TYPE_META = {
     bg: 'rgba(96,165,250,0.12)',
     border: 'rgba(96,165,250,0.25)',
   },
+  follow_request: {
+    icon: <UserPlus size={14} style={{ color: '#fbbf24' }} />,
+    bg: 'rgba(251,191,36,0.12)',
+    border: 'rgba(251,191,36,0.30)',
+  },
+  follow_accepted: {
+    icon: <UserCheck size={14} style={{ color: '#34d399' }} />,
+    bg: 'rgba(52,211,153,0.12)',
+    border: 'rgba(52,211,153,0.25)',
+  },
 };
 
 function notifText(n, lang) {
@@ -36,12 +46,16 @@ function notifText(n, lang) {
     if (n.type === 'save') return `${name} שמר את המתכון שלך ${story}`;
     if (n.type === 'friend_save') return `${name} שמר את ${story} — אולי גם לך יעניין?`;
     if (n.type === 'follow') return `${name} התחיל לעקוב אחריך`;
+    if (n.type === 'follow_request') return `${name} שלח בקשה לעקוב אחריך`;
+    if (n.type === 'follow_accepted') return `${name} אישר את בקשת המעקב שלך`;
     return `${name} ${story}`;
   }
   if (n.type === 'like') return `${name} liked your cocktail ${story}`;
   if (n.type === 'save') return `${name} saved your recipe ${story}`;
   if (n.type === 'friend_save') return `${name} saved ${story} — you might like it too!`;
   if (n.type === 'follow') return `${name} started following you`;
+  if (n.type === 'follow_request') return `${name} wants to follow you`;
+  if (n.type === 'follow_accepted') return `${name} accepted your follow request`;
   return `${name} ${story}`;
 }
 
@@ -70,10 +84,25 @@ export default function NotificationPanel({ onClose, onRead }) {
     return () => clearTimeout(timer);
   }, []);
 
-  const likes = notifications.filter(n => n.type === 'like');
-  const saves = notifications.filter(n => n.type === 'save');
+  const handleAccept = async (actorId) => {
+    try { await api.post(`/users/${actorId}/follow/accept`); } catch {}
+    setNotifications(prev => prev
+      .filter(n => !(n.type === 'follow_request' && n.actor_id === actorId))
+      .concat([{ id: `accepted-${actorId}-${Date.now()}`, type: 'follow', actor_id: actorId,
+                 actor_username: prev.find(n => n.actor_id === actorId)?.actor_username,
+                 actor_avatar:   prev.find(n => n.actor_id === actorId)?.actor_avatar,
+                 created_at: new Date().toISOString(), read: 0 }]));
+  };
+  const handleReject = async (actorId) => {
+    try { await api.post(`/users/${actorId}/follow/reject`); } catch {}
+    setNotifications(prev => prev.filter(n => !(n.type === 'follow_request' && n.actor_id === actorId)));
+  };
+
+  const requests   = notifications.filter(n => n.type === 'follow_request');
+  const likes      = notifications.filter(n => n.type === 'like');
+  const saves      = notifications.filter(n => n.type === 'save');
   const friendSaves = notifications.filter(n => n.type === 'friend_save');
-  const follows = notifications.filter(n => n.type === 'follow');
+  const follows    = notifications.filter(n => n.type === 'follow' || n.type === 'follow_accepted');
 
   return (
     <>
@@ -129,6 +158,41 @@ export default function NotificationPanel({ onClose, onRead }) {
             </div>
           ) : (
             <>
+              {requests.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-bold text-amber-400/70 uppercase tracking-wider mb-2 mt-2">
+                    {lang === 'he' ? '⏳ בקשות מעקב' : '⏳ Follow requests'}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {requests.map(n => (
+                      <div key={n.id}
+                           className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                           style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.30)' }}>
+                        <Avatar user={{ id: n.actor_id, username: n.actor_username, avatar: n.actor_avatar }} size={38} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white/90 text-xs leading-snug font-semibold">
+                            @{n.actor_username}
+                          </p>
+                          <p className="text-white/50 text-[11px]">
+                            {lang === 'he' ? 'רוצה לעקוב אחריך' : 'wants to follow you'}
+                          </p>
+                        </div>
+                        <button onClick={() => handleAccept(n.actor_id)}
+                                className="px-3 py-1.5 rounded-full text-[11px] font-semibold"
+                                style={{ background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', color: 'white' }}>
+                          {lang === 'he' ? 'אישור' : 'Accept'}
+                        </button>
+                        <button onClick={() => handleReject(n.actor_id)}
+                                className="px-3 py-1.5 rounded-full text-[11px] font-semibold"
+                                style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                          {lang === 'he' ? 'דחיה' : 'Reject'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Section
                 title={lang === 'he' ? '❤️ לייקים' : '❤️ Likes'}
                 items={likes}
@@ -145,7 +209,7 @@ export default function NotificationPanel({ onClose, onRead }) {
                 lang={lang}
               />
               <Section
-                title={lang === 'he' ? '👥 עוקבים חדשים' : '👥 New followers'}
+                title={lang === 'he' ? '👥 עוקבים' : '👥 Followers'}
                 items={follows}
                 lang={lang}
               />

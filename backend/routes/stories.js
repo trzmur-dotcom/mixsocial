@@ -33,6 +33,8 @@ const parseStory = (s) => ({
 });
 
 // Active stories (last 24h) grouped by user — for the stories bar.
+// Restricted to the user themselves + accepted-following relationships,
+// matching the home feed's privacy model.
 router.get('/grouped', auth, async (req, res) => {
   try {
     const stories = await db.prepare(`
@@ -49,8 +51,15 @@ router.get('/grouped', auth, async (req, res) => {
       WHERE s.deleted_at IS NULL
         AND s.created_at > datetime('now', '-1 day')
         AND s.expires_at > datetime('now')
+        AND (
+          s.user_id = ?
+          OR s.user_id IN (
+            SELECT following_id FROM follows
+            WHERE follower_id = ? AND status = 'accepted'
+          )
+        )
       ORDER BY s.created_at DESC
-    `).all(req.userId, req.userId, req.userId);
+    `).all(req.userId, req.userId, req.userId, req.userId, req.userId);
 
     const grouped = {};
     stories.forEach(s => {
@@ -80,7 +89,8 @@ router.get('/grouped', auth, async (req, res) => {
   }
 });
 
-// Feed — real users first, then demo seeds
+// Home feed — only stories from people I've followed (and got accepted), plus mine.
+// Explore (`/explore`) is where you discover everyone; the home feed stays personal.
 router.get('/feed', auth, async (req, res) => {
   try {
     const stories = await db.prepare(`
@@ -96,9 +106,16 @@ router.get('/feed', auth, async (req, res) => {
       LEFT JOIN story_likes   sl ON sl.story_id = s.id AND sl.user_id = ?
       WHERE s.deleted_at IS NULL
         AND s.expires_at > datetime('now')
-      ORDER BY COALESCE(u.is_demo, 0) ASC, s.created_at DESC
+        AND (
+          s.user_id = ?
+          OR s.user_id IN (
+            SELECT following_id FROM follows
+            WHERE follower_id = ? AND status = 'accepted'
+          )
+        )
+      ORDER BY s.created_at DESC
       LIMIT 50
-    `).all(req.userId, req.userId, req.userId);
+    `).all(req.userId, req.userId, req.userId, req.userId, req.userId);
     res.json(stories.map(parseStory));
   } catch (err) {
     console.error('[feed] error', err);

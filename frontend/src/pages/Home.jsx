@@ -186,12 +186,21 @@ export default function Home() {
       ) : feed.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
           <div className="text-6xl mb-4">🍸</div>
-          <p className="text-white/50 text-lg font-semibold mb-1">
-            {lang === 'he' ? 'עדיין אין קוקטיילים' : 'No cocktails yet'}
+          <p className="text-white/60 text-lg font-semibold mb-1">
+            {lang === 'he' ? 'הפיד שלך ריק' : 'Your feed is empty'}
           </p>
-          <p className="text-white/30 text-sm">
-            {lang === 'he' ? 'היה הראשון לשתף מתכון!' : 'Be the first to share a recipe!'}
+          <p className="text-white/40 text-sm mb-5">
+            {lang === 'he'
+              ? 'עקוב אחרי משתמשים בעמוד "גלה" כדי לראות כאן את הקוקטיילים שלהם'
+              : 'Follow people in Explore to see their cocktails here'}
           </p>
+          <button
+            onClick={() => window.location.assign('/explore')}
+            className="btn-primary px-5 py-2.5 text-sm"
+            style={{ borderRadius: '12px' }}
+          >
+            {lang === 'he' ? 'לעמוד גלה' : 'Open Explore'}
+          </button>
         </div>
       ) : (
         <div>

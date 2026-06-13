@@ -87,12 +87,16 @@ export default function Explore() {
 
   const handleFollowToggle = async (user, idx) => {
     try {
-      if (user.is_following) {
+      if (user.is_following || user.follow_pending) {
         await api.delete(`/users/${user.id}/follow`);
+        setUserResults(prev => prev.map((u, i) => i === idx ? { ...u, is_following: 0, follow_pending: 0 } : u));
       } else {
-        await api.post(`/users/${user.id}/follow`);
+        const { data } = await api.post(`/users/${user.id}/follow`);
+        const accepted = data.status === 'accepted';
+        setUserResults(prev => prev.map((u, i) => i === idx
+          ? { ...u, is_following: accepted ? 1 : 0, follow_pending: accepted ? 0 : 1 }
+          : u));
       }
-      setUserResults(prev => prev.map((u, i) => i === idx ? { ...u, is_following: !u.is_following } : u));
     } catch {}
   };
 
@@ -201,12 +205,16 @@ export default function Explore() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                 style={user.is_following
                   ? { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)' }
-                  : { background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', color: '#fff', border: 'none' }
+                  : user.follow_pending
+                    ? { background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.35)' }
+                    : { background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', color: '#fff', border: 'none' }
                 }
               >
                 {user.is_following
                   ? <><UserCheck size={12} /> {t('following_btn')}</>
-                  : <><UserPlus size={12} /> {t('follow')}</>
+                  : user.follow_pending
+                    ? <>⏳ {lang === 'he' ? 'בקשה ממתינה' : 'Requested'}</>
+                    : <><UserPlus size={12} /> {t('follow')}</>
                 }
               </button>
             </div>
